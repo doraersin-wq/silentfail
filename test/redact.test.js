@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { homedir } from 'node:os';
+import { join, sep } from 'node:path';
 import { redact, redactDeep, redactLine } from '../src/redact.js';
 
 test('blanks Anthropic-style keys, including the canary', () => {
@@ -30,6 +32,31 @@ test('blanks long token-like runs but keeps UUIDs, plain words and paths', () =>
   assert.equal(redact(hook), hook);
   const path = 'C:/Users/someone/.claude/plugins/cache/superpowers-dev/superpowers/6.3.0/hooks';
   assert.equal(redact(path), path);
+});
+
+test('blanks quoted or colon-separated key=value pairs, and flag-style secrets', () => {
+  assert.equal(redact('API_KEY="abc123"'), 'API_KEY="[redacted]"');
+  assert.equal(redact('password: hunter2'), 'password: [redacted]');
+  assert.equal(redact('--token abc123'), '--token [redacted]');
+});
+
+test('blanks Authorization: token|basic values, leaving Bearer to its own rule', () => {
+  assert.equal(redact('Authorization: token abc'), 'Authorization: token [redacted]');
+});
+
+test('blanks URL userinfo', () => {
+  assert.equal(redact('https://me:pw@host/x'), 'https://[redacted]@host/x');
+});
+
+test('replaces the home folder with ~, in both slash directions', () => {
+  const p = join(homedir(), 'a');
+  assert.equal(redact(p), `~${sep}a`);
+  assert.equal(redact(homedir().replace(/\\/g, '/')), '~');
+});
+
+test('strips ANSI escapes and control characters, keeping newlines and tabs', () => {
+  assert.equal(redact('a\x1b[2Jb'), 'ab');
+  assert.equal(redact('line1\nline2\ttabbed\rcr'), 'line1\nline2\ttabbedcr');
 });
 
 test('redact treats null and undefined as empty', () => {

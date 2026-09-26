@@ -61,6 +61,28 @@ test('says so when nothing is broken', () => {
   assert.equal(renderText(empty, { days: 7 }), 'silentfail: 1 session, last 7 days\n\nNothing broken found.\n\n');
 });
 
+test('says so when there are no session logs at all', () => {
+  const empty = { findings: [], stats: { files: 0, sessions: 0, badLines: 0, unrecognized: {}, versions: { min: null, max: null }, warnings: [] } };
+  assert.equal(renderText(empty, { days: 30 }), 'silentfail: 0 sessions, last 30 days\n\nNo Claude Code session logs in the last 30 days.\n\n');
+});
+
+test('command and stderr lines are hidden for unknown findings unless --all, and embedded newlines cannot fake a report line', () => {
+  const injected = {
+    findings: [
+      { id: 'hook-no-trace', severity: 'unknown', subject: 'Hook X (user settings)', message: 'line one\nline two', evidence: { command: 'sneaky.sh', stderr: 'oops' } },
+    ],
+    stats: { files: 1, sessions: 1, badLines: 0, unrecognized: {}, versions: { min: null, max: null }, warnings: [] },
+  };
+  const out = renderText(injected, { days: 14 });
+  const bodyLines = out.split('\n').filter(l => l.startsWith('  ['));
+  assert.deepEqual(bodyLines, ['  [?] Hook X (user settings): line one line two']);
+  assert.ok(!out.includes('command:'));
+  assert.ok(!out.includes('stderr:'));
+  const all = renderText(injected, { days: 14, all: true });
+  assert.ok(all.includes('command: sneaky.sh'));
+  assert.ok(all.includes('stderr: oops'));
+});
+
 test('json report is redacted, object keys included', () => {
   const withBadKey = { ...result, stats: { ...result.stats, unrecognized: { 'x/sk-ant-FAKE0000000000000000': 1 } } };
   const text = renderJson(withBadKey, { days: 14 });

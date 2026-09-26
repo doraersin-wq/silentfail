@@ -13,7 +13,7 @@ async function readJson(file, warnings) {
     return null;
   }
   try {
-    return JSON.parse(text);
+    return JSON.parse(text.replace(/^\uFEFF/, ''));
   } catch {
     warnings.push(`could not parse ${file}`);
     return null;

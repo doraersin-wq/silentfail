@@ -114,3 +114,14 @@ test('project .mcp.json approval merges enableAllProjectMcpServers, enabledMcpjs
     home.cleanup();
   }
 });
+
+test('a settings.json with a leading BOM still parses with no warning', async () => {
+  const home = makeFakeHome();
+  try {
+    home.write('settings.json', `﻿${JSON.stringify({ enabledPlugins: {} })}`);
+    const cfg = await loadConfig({ env: home.env });
+    assert.deepEqual(cfg.warnings, []);
+  } finally {
+    home.cleanup();
+  }
+});

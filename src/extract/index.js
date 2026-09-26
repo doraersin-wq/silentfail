@@ -63,6 +63,12 @@ function noteVersion(versions, raw) {
   if (versions.max === null || compareVersions(v, versions.max) > 0) versions.max = v;
 }
 
+// Caps how many distinct unrecognized shapes we remember, so a hostile or wildly
+// varied log set can't grow this map without bound. Once the cap is hit, every
+// further new shape is folded into a single '(other)' key.
+const MAX_UNRECOGNIZED_SHAPES = 200;
+
 function bump(map, key) {
+  if (!map.has(key) && map.size >= MAX_UNRECOGNIZED_SHAPES) key = '(other)';
   map.set(key, (map.get(key) ?? 0) + 1);
 }

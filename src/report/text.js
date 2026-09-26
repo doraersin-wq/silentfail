@@ -7,6 +7,10 @@ const STYLE = { broken: '\x1b[31m', warning: '\x1b[33m', unknown: '\x1b[36m', di
 
 export function renderText(result, { days, all = false, color = false }) {
   const paint = (style, s) => (color ? `${STYLE[style]}${s}${STYLE.reset}` : s);
+  // Every field that lands in the report goes through this before printing, so
+  // a subject, message, shape or warning can never fake an extra report line by
+  // embedding a newline of its own.
+  const one = s => redact(s).replace(/\s*\n\s*/g, ' ');
   const { findings, stats } = result;
   const { min, max } = stats.versions;
   const versions = min ? `, Claude Code ${min === max ? min : `${min}-${max}`}` : '';
@@ -20,10 +24,14 @@ export function renderText(result, { days, all = false, color = false }) {
     lines.push(paint(severity, HEADINGS[severity]));
     for (const f of group) {
       const last = f.evidence?.last ?? f.evidence?.lastError;
-      const when = typeof last === 'string' ? ` (last ${redact(last.slice(0, 10))})` : '';
-      lines.push(`  ${paint(severity, MARKS[severity])} ${redact(f.subject)}: ${redact(f.message)}${when}`);
-      if (f.evidence?.command) lines.push(`      command: ${redactLine(f.evidence.command)}`);
-      if (f.evidence?.stderr) lines.push(`      stderr: ${redactLine(f.evidence.stderr)}`);
+      const when = typeof last === 'string' ? ` (last ${one(last.slice(0, 10))})` : '';
+      lines.push(`  ${paint(severity, MARKS[severity])} ${one(f.subject)}: ${one(f.message)}${when}`);
+      // Command and stderr detail lines are only shown for problems worth
+      // acting on (or everything, with --all), so a merely-unverifiable
+      // finding doesn't print a command for no reason.
+      const showDetail = all || severity === 'broken' || severity === 'warning';
+      if (showDetail && f.evidence?.command) lines.push(`      command: ${redactLine(f.evidence.command)}`);
+      if (showDetail && f.evidence?.stderr) lines.push(`      stderr: ${redactLine(f.evidence.stderr)}`);
     }
     lines.push('');
   }
@@ -31,7 +39,7 @@ export function renderText(result, { days, all = false, color = false }) {
   const ok = findings.filter(f => f.severity === 'ok');
   if (all && ok.length > 0) {
     lines.push('OK');
-    for (const f of ok) lines.push(`  [ok] ${redact(f.subject)}: ${redact(f.message)}`);
+    for (const f of ok) lines.push(`  [ok] ${one(f.subject)}: ${one(f.message)}`);
     lines.push('');
   } else if (ok.length > 0) {
     const mcp = ok.filter(f => f.id.startsWith('mcp-')).length;
@@ -41,9 +49,9 @@ export function renderText(result, { days, all = false, color = false }) {
   const unrecognized = Object.values(stats.unrecognized).reduce((a, b) => a + b, 0);
   if (unrecognized > 0) {
     lines.push(`${plural(unrecognized, 'log line')} not recognized (newer Claude Code?). This is not an error.`);
-    if (all) for (const [shape, n] of Object.entries(stats.unrecognized)) lines.push(`  ${n}  ${redact(shape)}`);
+    if (all) for (const [shape, n] of Object.entries(stats.unrecognized)) lines.push(`  ${n}  ${one(shape)}`);
   }
   if (stats.badLines > 0) lines.push(`${plural(stats.badLines, 'unreadable log line')} skipped.`);
-  for (const w of stats.warnings) lines.push(`note: ${redact(w)}`);
+  for (const w of stats.warnings) lines.push(`note: ${one(w)}`);
   return `${lines.join('\n')}\n`;
 }

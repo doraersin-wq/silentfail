@@ -16,8 +16,20 @@ export async function findLogFiles(projectsDir, { days, now = Date.now() }) {
     }
     for (const e of entries) {
       const p = join(dir, e.name);
-      if (e.isDirectory()) await walk(p);
-      else if (e.isFile() && e.name.endsWith('.jsonl') && (await stat(p)).mtimeMs >= cutoff) found.push(p);
+      if (e.isDirectory()) {
+        await walk(p);
+      } else if (e.isFile() && e.name.endsWith('.jsonl')) {
+        let info;
+        try {
+          info = await stat(p);
+        } catch {
+          // The file can vanish between readdir and stat (another Claude Code
+          // session rotating or removing a log concurrently). Skip it rather
+          // than crash; hard to trigger reliably, so no dedicated test.
+          continue;
+        }
+        if (info.mtimeMs >= cutoff) found.push(p);
+      }
     }
   }
   await walk(projectsDir);
