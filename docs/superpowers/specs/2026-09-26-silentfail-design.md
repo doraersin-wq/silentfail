@@ -68,6 +68,15 @@ observed on this machine. Any attachment whose type starts with `hook_`, other
 than the two above, is treated as a hook problem and reported under its raw
 type name.
 
+**Hook-logging spike result (2026-09-26, Claude Code 2.1.281):** the live
+headless spike couldn't run because the bundled CLI isn't logged in, so the
+existing logs answered it instead. One session made 139 Edit/Write calls with
+a PostToolUse `Edit|Write` hook active: the hook provably ran, since it
+produced `hook_additional_context` 3 times, yet it logged zero `hook_success`
+entries. Successful PostToolUse runs therefore leave no trace, and
+`TRACED_EVENTS` stays `{SessionStart, Stop}`. The attachment type a failing
+hook produces is still unobserved; the generic `hook_*` rule covers it.
+
 ## 3. Architecture
 
 Node >= 22 (Node 20 reached end of life in April 2026), plain ES modules, zero
