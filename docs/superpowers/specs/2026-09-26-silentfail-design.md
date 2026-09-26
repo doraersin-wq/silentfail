@@ -70,7 +70,8 @@ type name.
 
 ## 3. Architecture
 
-Node >= 20, plain ES modules, zero runtime dependencies. There are four stages,
+Node >= 22 (Node 20 reached end of life in April 2026), plain ES modules, zero
+runtime dependencies. There are four stages,
 and each can be tested on its own:
 
 ```
@@ -98,7 +99,8 @@ sources/  →  extract/  →  analyze/  →  report/
   - **Enabled plugins:** `enabledPlugins` in settings, with install paths from
     `plugins/installed_plugins.json`.
 
-  A missing or unreadable file is recorded as a config warning and skipped.
+  A missing file is skipped quietly. A file that can't be read or parsed is
+  skipped and recorded as a config warning.
 
 ### 3.2 `src/extract/`
 
@@ -108,11 +110,16 @@ These are pure functions: one log entry in, zero or more facts out.
 - `mcpCalls.js` → `{ kind: 'mcp-call', server, ok, sessionId, cwd, ts }`. It keeps
   a per-session `tool_use.id → name` map. A result with no matching call becomes
   an `orphan-result` fact.
-- `hookRuns.js` → `{ kind: 'hook-run', event, command, exitCode, durationMs, stderrLine, problemType?, sessionId, ts }`
+- `hookRuns.js` → `{ kind: 'hook-run', event, command, exitCode, durationMs, stderr, problemType, sessionId, cwd, ts }`
   from `hook_success`, the other `hook_*` types, and `stop_hook_summary`.
-- `unrecognized.js` counts entry shapes that no extractor claimed, keyed by
-  `type/subtype/attachment.type`, and records the minimum and maximum
-  `version` seen.
+  `stderr` is kept only for failed runs.
+- `common.js` holds the shared helpers: tool-name parsing, server keys, and
+  safe field access.
+- `shapes.js` lists the entry shapes seen in real logs.
+- `index.js` runs every extractor on each entry. An entry counts as
+  unrecognized when its `type/subtype/attachment.type` shape isn't on that
+  list and no extractor produced a fact from it. `index.js` also records the
+  sessions, working directories, and the minimum and maximum `version` seen.
 
 ### 3.3 `src/analyze/`
 
@@ -154,7 +161,7 @@ Example:
 silentfail: 37 sessions, last 14 days, Claude Code 2.1.229-2.1.281
 
 BROKEN
-  [x] MCP filesystem: 2 of 2 calls failed (last 2026-09-23, project PROGRAMS)
+  [x] MCP filesystem: 2 of 2 calls failed (last 2026-09-23)
 WARNING
   [!] MCP cloudflare: needs auth in 9 of 9 sessions
 UNKNOWN
@@ -230,7 +237,7 @@ Test-first, using `node --test`.
   `test/stress/make-big.js` concatenates the forged fixtures into a 200 MB file
   in the temp directory. The test requires a full run in under 60 s, with
   memory use (RSS) under 256 MB.
-- **CI:** a GitHub Actions matrix (Ubuntu, macOS, Windows × Node 20, 22, 24),
+- **CI:** a GitHub Actions matrix (Ubuntu, macOS, Windows × Node 22, 24),
   which is free for public repos.
 - **Real-machine check (last task):** run `npx .` on the author's machine and
   confirm the `filesystem` finding.
