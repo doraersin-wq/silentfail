@@ -1,7 +1,7 @@
 # silentfail: Design
 
 **Date:** 2026-09-26
-**Status:** Awaiting user review
+**Status:** Approved 2026-09-26
 
 ## 1. Purpose
 
@@ -242,7 +242,8 @@ Test-first, using `node --test`.
 ## 7. Build process
 
 The plan comes from the writing-plans skill and runs in one session with
-subagent-driven development. Subagents run on Sonnet (the author is on the Pro
+subagent-driven development. The main session (planning and review) runs on Opus 5.5.
+Implementation subagents run on Sonnet 5 (the author is on the Pro
 plan, which doesn't include Fable). A phone push goes out when the plan finishes
 or blocks. If the Pro usage limit interrupts it, it resumes when the user says
 "continue".
