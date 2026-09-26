@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { createHookAnalyzer } from './analyze/hooks.js';
 import { createMcpAnalyzer } from './analyze/mcp.js';
 import { createExtractor } from './extract/index.js';
@@ -33,11 +33,13 @@ export async function run({ env = process.env, days = 14, now = Date.now() } = {
     }
   }
 
-  const config = await loadConfig({ env, projectPaths: [...state.cwds] });
+  const config = await loadConfig({ env, projectPaths: [...state.cwds].filter(p => isAbsolute(p)) });
   warnings.push(...config.warnings);
   const context = { cwds: state.cwds };
-  const findings = [...mcp.finish(config, context), ...hooks.finish(config, context)]
-    .sort((a, b) => ORDER[a.severity] - ORDER[b.severity] || a.subject.localeCompare(b.subject));
+  const findings = state.sessions.size === 0
+    ? []
+    : [...mcp.finish(config, context), ...hooks.finish(config, context)]
+        .sort((a, b) => ORDER[a.severity] - ORDER[b.severity] || a.subject.localeCompare(b.subject));
 
   return {
     findings,

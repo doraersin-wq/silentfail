@@ -79,3 +79,14 @@ test('end to end: no Claude folder exits 2', () => {
   assert.equal(r.status, 2);
   assert.match(r.stderr, /No Claude Code folder found/);
 });
+
+test('end to end: an empty projects folder (no session logs at all) exits 0 and says so', () => {
+  const home = makeFakeHome();
+  try {
+    const r = runCli(home.env);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /No Claude Code session logs in the last 14 days\./);
+  } finally {
+    home.cleanup();
+  }
+});

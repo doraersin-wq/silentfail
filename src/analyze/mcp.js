@@ -3,6 +3,7 @@ import { finding, later, ranInProject } from './common.js';
 
 export function createMcpAnalyzer() {
   const servers = new Map();
+  let sawStatus = false;
   const get = (key, name) => {
     let s = servers.get(key);
     if (!s) {
@@ -15,6 +16,7 @@ export function createMcpAnalyzer() {
   return {
     add(f) {
       if (f.kind === 'mcp-status') {
+        sawStatus = true;
         const s = get(f.server, f.name);
         const sid = f.sessionId ?? '(no session)';
         s.sessions.add(sid);
@@ -44,8 +46,9 @@ export function createMcpAnalyzer() {
         const subject = `MCP ${s.label}`;
         const n = s.sessions.size;
         const before = findings.length;
-        if (s.failed.size > 0) {
-          findings.push(finding('mcp-failed-connect', 'broken', subject, `failed to connect in ${s.failed.size} of ${plural(n, 'session')}`, { sessions: n, failed: s.failed.size }));
+        const failedNotConnected = [...s.failed].filter(id => !s.connected.has(id)).length;
+        if (failedNotConnected > 0) {
+          findings.push(finding('mcp-failed-connect', 'broken', subject, `failed to connect in ${failedNotConnected} of ${plural(n, 'session')}`, { sessions: n, failed: failedNotConnected }));
         }
         if (s.errors > 0) {
           const ratio = s.errors / s.calls;
@@ -72,8 +75,13 @@ export function createMcpAnalyzer() {
       for (const c of config.mcpServers) {
         if (servers.has(c.key) || reported.has(c.key)) continue;
         if (c.project && !ranInProject(cwds, c.project)) continue;
+        if (c.enabled === false) continue;
         reported.add(c.key);
-        findings.push(finding('mcp-never-seen', 'warning', `MCP ${c.label}`, `configured (${c.scope} scope) but never showed up in the logs`, { scope: c.scope, source: c.source }));
+        const severity = sawStatus ? 'warning' : 'unknown';
+        const message = sawStatus
+          ? `configured (${c.scope} scope) but never showed up in the logs`
+          : "can't verify: these logs don't record which servers connected";
+        findings.push(finding('mcp-never-seen', severity, `MCP ${c.label}`, message, { scope: c.scope, source: c.source }));
       }
       return findings;
     },

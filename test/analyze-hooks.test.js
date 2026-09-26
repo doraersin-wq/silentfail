@@ -14,11 +14,18 @@ test('a configured SessionStart hook that ran is ok', () => {
   ]);
 });
 
-test('a configured SessionStart or Stop hook that never ran is a warning', () => {
+test('a configured SessionStart hook that never ran cannot be verified; a Stop hook that never ran is a warning', () => {
   const cfg = { mcpServers: [], hooks: [hook({ command: 'missing.sh' }), hook({ event: 'Stop', command: 'bye', plugin: 'sp', scope: 'plugin' })] };
   assert.deepEqual(pick(analyzeHooks([run()], cfg, ctx)), [
-    ['hook-never-ran', 'warning', 'Hook SessionStart (user settings)', 'configured but never ran'],
+    ['hook-no-trace', 'unknown', 'Hook SessionStart (user settings)', "can't verify: no SessionStart run was logged (hooks that print nothing may not be logged)"],
     ['hook-never-ran', 'warning', 'Hook Stop (plugin sp)', 'configured but never ran'],
+  ]);
+});
+
+test('a non-command Stop hook cannot be verified regardless of type', () => {
+  const cfg = { mcpServers: [], hooks: [hook({ event: 'Stop', type: 'prompt', command: null })] };
+  assert.deepEqual(pick(analyzeHooks([], cfg, ctx)), [
+    ['hook-no-trace', 'unknown', 'Hook Stop (user settings)', "can't verify: prompt hooks leave no trace in the logs"],
   ]);
 });
 
@@ -41,8 +48,8 @@ test('failed runs are broken, grouped by event and command, with the latest stde
   ];
   const findings = analyzeHooks(facts, none, ctx);
   assert.deepEqual(pick(findings), [
-    ['hook-error', 'broken', 'Hook SessionStart (not in your config)', 'failed 2 times (exit code 1)'],
-    ['hook-error', 'broken', 'Hook Stop (not in your config)', 'failed 1 time (stop_hook_error)'],
+    ['hook-error', 'broken', 'Hook SessionStart (not in your config)', 'failed 2 of 2 runs (exit code 1)'],
+    ['hook-error', 'broken', 'Hook Stop (not in your config)', 'failed 1 of 1 run (stop_hook_error)'],
   ]);
   assert.equal(findings[0].evidence.stderr, 'second');
   assert.equal(findings[0].evidence.command, 'start.sh');
@@ -61,8 +68,14 @@ test('createHookAnalyzer fed one fact at a time matches analyzeHooks', () => {
 });
 
 test('a configured hook that failed is reported once, as broken', () => {
-  const findings = analyzeHooks([run({ exitCode: 2, stderr: 'no' })], { mcpServers: [], hooks: [hook()] }, ctx);
-  assert.deepEqual(pick(findings), [['hook-error', 'broken', 'Hook SessionStart (user settings)', 'failed 1 time (exit code 2)']]);
+  const findings = analyzeHooks([run({ exitCode: 1, stderr: 'no' })], { mcpServers: [], hooks: [hook()] }, ctx);
+  assert.deepEqual(pick(findings), [['hook-error', 'broken', 'Hook SessionStart (user settings)', 'failed 1 of 1 run (exit code 1)']]);
+});
+
+test('one failure among many runs, with a healthy latest run, is a warning', () => {
+  const facts = [run({ exitCode: 1, ts: '2026-09-19T10:00:00.000Z' }), ...Array.from({ length: 200 }, () => run({ ts: '2026-09-20T10:00:00.000Z' }))];
+  const findings = analyzeHooks(facts, none, ctx);
+  assert.deepEqual(pick(findings), [['hook-error', 'warning', 'Hook SessionStart (not in your config)', 'failed 1 of 201 runs (exit code 1)']]);
 });
 
 test('slow hooks are warnings', () => {
@@ -70,6 +83,6 @@ test('slow hooks are warnings', () => {
   assert.deepEqual(pick(findings), [['hook-slow', 'warning', 'Hook SessionStart (not in your config)', 'took over 10s 2 times, up to 30.0s']]);
 });
 
-test('only SessionStart and Stop are traced for now', () => {
-  assert.deepEqual([...TRACED_EVENTS].sort(), ['SessionStart', 'Stop']);
+test('only Stop is traced for now', () => {
+  assert.deepEqual([...TRACED_EVENTS].sort(), ['Stop']);
 });

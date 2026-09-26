@@ -36,6 +36,26 @@ test('hook_additional_context says nothing about success', () => {
   assert.deepEqual(extractHookRuns({ ...base, type: 'attachment', attachment: { type: 'hook_additional_context', hookEvent: 'SessionStart' } }), []);
 });
 
+test('hook_system_message is not a problem and is left for the unrecognized counter', () => {
+  assert.deepEqual(extractHookRuns({ ...base, type: 'attachment', attachment: { type: 'hook_system_message', hookEvent: 'SessionStart' } }), []);
+});
+
+test('hook_blocking_error is an intentional block, not a failure', () => {
+  assert.deepEqual(extractHookRuns({ ...base, type: 'attachment', attachment: { type: 'hook_blocking_error', hookEvent: 'PreToolUse', command: 'x', stderr: 'blocked' } }), []);
+});
+
+test('hook_success with exit code 2 is not failed and keeps no stderr', () => {
+  const [fact] = extractHookRuns({ ...base, type: 'attachment', attachment: { type: 'hook_success', hookEvent: 'SessionStart', command: 'x', exitCode: 2, stderr: 'not really an error' } });
+  assert.equal(fact.exitCode, 2);
+  assert.equal(fact.stderr, null);
+  assert.equal(fact.problemType, null);
+});
+
+test('commands read from the log are trimmed like config commands', () => {
+  const [fact] = extractHookRuns({ ...base, type: 'attachment', attachment: { type: 'hook_success', hookEvent: 'SessionStart', command: '  start.sh  ', exitCode: 0 } });
+  assert.equal(fact.command, 'start.sh');
+});
+
 test('stop_hook_summary lists each Stop hook and each error', () => {
   const facts = extractHookRuns({
     ...base,
@@ -82,6 +102,13 @@ test('createExtractor pairs calls across entries', () => {
   extract({ type: 'assistant', sessionId: 'a', message: { content: [{ type: 'tool_use', id: 't', name: 'mcp__fs__read' }] } });
   const facts = extract({ type: 'user', sessionId: 'a', message: { content: [{ type: 'tool_result', tool_use_id: 't', is_error: true }] } });
   assert.deepEqual(facts.map(f => [f.kind, f.server, f.ok]), [['mcp-call', 'fs', false]]);
+});
+
+test('createExtractor caps distinct unrecognized shapes at 200, bumping (other) after that', () => {
+  const { extract, state } = createExtractor();
+  for (let i = 0; i < 250; i++) extract({ type: `brand-new-thing-${i}` });
+  assert.equal(state.unrecognized.size, 201);
+  assert.equal(state.unrecognized.get('(other)'), 50);
 });
 
 test('createExtractor counts entries that make an extractor throw instead of crashing', () => {

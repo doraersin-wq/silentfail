@@ -25,6 +25,32 @@ const list = v => (Array.isArray(v) ? v : []);
 // hooks.json wraps events in a "hooks" key; inline plugin.json hooks may not.
 const unwrapHooks = v => ('hooks' in obj(v) ? obj(v).hooks : v);
 
+const normPath = p => {
+  const r = resolve(String(p));
+  return process.platform === 'win32' ? r.toLowerCase() : r;
+};
+
+// Project-scope .mcp.json servers need explicit approval before Claude Code will
+// load them. Merges enableAllProjectMcpServers / enabledMcpjsonServers /
+// disabledMcpjsonServers across ~/.claude.json's projects[<this folder>] entry
+// and the project's own settings files, and returns a per-name approval check.
+function mcpApproval(globalProjects, project, projectSettingsList) {
+  let enableAll = false;
+  const enabledNames = new Set();
+  const disabledNames = new Set();
+  const consider = settings => {
+    if (settings.enableAllProjectMcpServers === true) enableAll = true;
+    for (const n of list(settings.enabledMcpjsonServers)) if (typeof n === 'string') enabledNames.add(n);
+    for (const n of list(settings.disabledMcpjsonServers)) if (typeof n === 'string') disabledNames.add(n);
+  };
+  const target = normPath(project);
+  for (const [key, entry] of Object.entries(obj(globalProjects))) {
+    if (normPath(key) === target) consider(obj(entry));
+  }
+  for (const settings of projectSettingsList) consider(settings);
+  return name => !disabledNames.has(name) && (enabledNames.has(name) || enableAll);
+}
+
 // Collects configured MCP servers, hooks and enabled plugins from every place Claude Code keeps them.
 export async function loadConfig({ env = process.env, projectPaths = [] } = {}) {
   const warnings = [];
@@ -33,11 +59,11 @@ export async function loadConfig({ env = process.env, projectPaths = [] } = {}) 
   const plugins = [];
   const enabled = new Set();
 
-  const addServers = (servers, scope, project, source, plugin = null) => {
+  const addServers = (servers, scope, project, source, plugin = null, isEnabled = () => true) => {
     for (const name of Object.keys(obj(servers))) {
       const label = plugin ? `plugin:${plugin}:${name}` : name;
       if (plugin && mcpServers.some(s => s.label === label)) continue;
-      mcpServers.push({ key: serverKey(label), label, scope, project, source });
+      mcpServers.push({ key: serverKey(label), label, scope, project, source, enabled: isEnabled(name) });
     }
   };
   const addHooks = (config, scope, project, source, plugin = null) => {
@@ -80,13 +106,16 @@ export async function loadConfig({ env = process.env, projectPaths = [] } = {}) 
 
   for (const project of new Set(projectPaths)) {
     const mcpFile = join(project, '.mcp.json');
-    addServers(obj(await readJson(mcpFile, warnings)).mcpServers, 'project', project, mcpFile);
+    const projectSettings = [];
     for (const [name, scope] of [['settings.json', 'project'], ['settings.local.json', 'local']]) {
       const file = join(project, '.claude', name);
       const settings = obj(await readJson(file, warnings));
+      projectSettings.push(settings);
       addHooks(settings.hooks, scope, project, file);
       noteEnabled(settings);
     }
+    const isEnabled = mcpApproval(global.projects, project, projectSettings);
+    addServers(obj(await readJson(mcpFile, warnings)).mcpServers, 'project', project, mcpFile, null, isEnabled);
   }
 
   const installed = obj(obj(await readJson(join(dir, 'plugins', 'installed_plugins.json'), warnings)).plugins);

@@ -74,3 +74,43 @@ test('an enabled plugin that is not installed is a warning', async () => {
     home.cleanup();
   }
 });
+
+test('non-project scopes are always enabled', async () => {
+  const home = makeFakeHome();
+  try {
+    home.write('.claude.json', { mcpServers: { memory: {} } });
+    const cfg = await loadConfig({ env: home.env });
+    assert.equal(cfg.mcpServers[0].enabled, true);
+  } finally {
+    home.cleanup();
+  }
+});
+
+test('a project .mcp.json server with no approval anywhere defaults to disabled', async () => {
+  const home = makeFakeHome();
+  try {
+    home.write(join(home.projectDir, '.mcp.json'), { mcpServers: { a: {} } });
+    const cfg = await loadConfig({ env: home.env, projectPaths: [home.projectDir] });
+    assert.equal(cfg.mcpServers[0].enabled, false);
+  } finally {
+    home.cleanup();
+  }
+});
+
+test('project .mcp.json approval merges enableAllProjectMcpServers, enabledMcpjsonServers and disabledMcpjsonServers across sources', async () => {
+  const home = makeFakeHome();
+  try {
+    home.write(join(home.projectDir, '.mcp.json'), { mcpServers: { a: {}, b: {}, c: {}, d: {} } });
+    // a: approved by name via ~/.claude.json's projects[] entry for this folder.
+    home.write('.claude.json', { projects: { [home.projectDir]: { enabledMcpjsonServers: ['a'] } } });
+    // c, d: approved via enableAllProjectMcpServers in project settings.json.
+    home.write(join(home.projectDir, '.claude', 'settings.json'), { enableAllProjectMcpServers: true });
+    // b: explicitly disabled in settings.local.json, which wins even under enableAll.
+    home.write(join(home.projectDir, '.claude', 'settings.local.json'), { disabledMcpjsonServers: ['b'] });
+    const cfg = await loadConfig({ env: home.env, projectPaths: [home.projectDir] });
+    const byName = Object.fromEntries(cfg.mcpServers.map(s => [s.label, s.enabled]));
+    assert.deepEqual(byName, { a: true, b: false, c: true, d: true });
+  } finally {
+    home.cleanup();
+  }
+});

@@ -12,7 +12,8 @@ export function renderText(result, { days, all = false, color = false }) {
   const versions = min ? `, Claude Code ${min === max ? min : `${min}-${max}`}` : '';
   const lines = [`silentfail: ${plural(stats.sessions, 'session')}, last ${days} days${versions}`, ''];
 
-  if (!findings.some(f => f.severity !== 'ok')) lines.push('Nothing broken found.', '');
+  if (stats.sessions === 0) lines.push(`No Claude Code session logs in the last ${days} days.`, '');
+  else if (!findings.some(f => f.severity !== 'ok')) lines.push('Nothing broken found.', '');
   for (const severity of ['broken', 'warning', 'unknown']) {
     const group = findings.filter(f => f.severity === severity);
     if (group.length === 0) continue;

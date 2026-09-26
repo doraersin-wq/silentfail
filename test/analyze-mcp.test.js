@@ -79,9 +79,33 @@ test('configured servers that never show up are flagged, but only where a sessio
     { key: 'elsewhere', label: 'elsewhere', scope: 'project', project: '/other', source: '/other/.mcp.json' },
     { key: 'seen', label: 'seen', scope: 'user', project: null, source: '.claude.json' },
   ] };
-  assert.deepEqual(pick(analyzeMcp([call('seen', true)], cfg, ctx)), [
+  // status('seen', 'connected') gives the analyzer connection-status evidence, so
+  // never-seen findings elsewhere stay 'warning' rather than 'unknown' (F4b).
+  const facts = [call('seen', true), status('seen', 'connected')];
+  assert.deepEqual(pick(analyzeMcp(facts, cfg, ctx)), [
     ['mcp-ok', 'ok', 'MCP seen', '1 call, 0 failed'],
     ['mcp-never-seen', 'warning', 'MCP ghost', 'configured (user scope) but never showed up in the logs'],
     ['mcp-never-seen', 'warning', 'MCP here', 'configured (project scope) but never showed up in the logs'],
+  ]);
+});
+
+test('never-seen is unknown, not warning, when the logs record no connection status at all', () => {
+  const cfg = { hooks: [], mcpServers: [{ key: 'ghost', label: 'ghost', scope: 'user', project: null, source: '.claude.json' }] };
+  assert.deepEqual(pick(analyzeMcp([], cfg, ctx)), [
+    ['mcp-never-seen', 'unknown', 'MCP ghost', "can't verify: these logs don't record which servers connected"],
+  ]);
+});
+
+test('a server that is in your config but not enabled for the project is never flagged never-seen', () => {
+  const cfg = { hooks: [], mcpServers: [{ key: 'ghost', label: 'ghost', scope: 'project', project: '/w/p', source: '/w/p/.mcp.json', enabled: false }] };
+  assert.deepEqual(pick(analyzeMcp([status('other', 'connected')], cfg, ctx)), [
+    ['mcp-ok', 'ok', 'MCP other', 'connected in 1 of 1 session'],
+  ]);
+});
+
+test('a server that failed then connected later in the same session is not a failed-connect', () => {
+  const facts = [status('flaky', 'failed', 's1'), status('flaky', 'connected', 's1')];
+  assert.deepEqual(pick(analyzeMcp(facts, noConfig, ctx)), [
+    ['mcp-ok', 'ok', 'MCP flaky', 'connected in 1 of 1 session'],
   ]);
 });
