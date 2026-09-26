@@ -6,6 +6,8 @@ Finds the parts of your Claude Code setup that look fine but are broken.
 npx silentfail
 ```
 
+Example output (from `npx silentfail --days 90` on the author's machine):
+
 ```
 silentfail: 38 sessions, last 90 days, Claude Code 2.1.170-2.1.281
 
@@ -23,17 +25,18 @@ OK: 25 MCP servers, 1 hook (--all to list)
 | MCP connection failures | broken | A server failed to connect |
 | MCP needs auth | warning | A server kept asking you to log in |
 | MCP stuck pending | warning | A server never finished connecting |
-| MCP never seen | warning | A server is in your config but never loaded |
+| MCP never seen | warning | A server is in your config but never showed up in the logs |
 | Hook errors | broken | A hook exited non-zero or errored |
 | Slow hooks | warning | A hook took over 10 seconds |
-| Hook never ran | warning | A configured SessionStart or Stop hook never ran |
+| Hook never ran | warning | A configured Stop hook never ran |
 | Can't verify | unknown | A hook on an event that leaves no trace when it succeeds |
 
 ## Privacy
 
 - It runs entirely on your machine. Nothing is uploaded, and there's no telemetry.
 - It reads Claude Code's own session logs (`~/.claude/projects`) and your config files. It never prints your conversations.
-- Anything that looks like a key or token is blanked out before it's printed.
+- Anything that looks like a key or token is blanked out before it's printed. This is best effort, so glance over a report before sharing it.
+- For a failing hook it prints the hook's command and the first line of its error output, after blanking.
 
 ## Options
 
