@@ -62,3 +62,12 @@ test('slow hooks are warnings', () => {
 test('only SessionStart and Stop are traced for now', () => {
   assert.deepEqual([...TRACED_EVENTS].sort(), ['SessionStart', 'Stop']);
 });
+
+test('unverified hook_* problem types do not surface raw stderr', () => {
+  // hook_non_blocking_error (LOG-SHAPES.md item 6) is hypothetical: no confirmed
+  // real-world example exists. Its stderr must not be echoed verbatim, unlike a
+  // bad exit on hook_success (problemType null) or a stop_hook_error.
+  const findings = analyzeHooks([run({ exitCode: null, problemType: 'hook_non_blocking_error', stderr: 'unverified shape text' })], none, ctx);
+  assert.deepEqual(pick(findings), [['hook-error', 'broken', 'Hook SessionStart (not in your config)', 'failed 1 time (hook_non_blocking_error)']]);
+  assert.equal(findings[0].evidence.stderr, null);
+});
