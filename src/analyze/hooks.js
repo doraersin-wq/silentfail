@@ -6,15 +6,6 @@ import { finding, later, ranInProject } from './common.js';
 export const TRACED_EVENTS = new Set(['SessionStart', 'Stop']);
 const SLOW_MS = 10_000;
 
-// A hook-run's stderr is only trusted verbatim when it comes from a shape we've
-// actually confirmed exists in real logs: a bad exit on `hook_success`
-// (problemType null) or a `stop_hook_summary` error (`stop_hook_error`). Other
-// `hook_*` attachment types (LOG-SHAPES.md item 6, e.g. `hook_non_blocking_error`)
-// are hypothetical — no confirmed real-world example exists — so their stderr
-// text is unverified and is not echoed into the report; the finding still shows
-// the event, command and how it failed.
-const VERIFIED_PROBLEM_TYPES = new Set([null, 'stop_hook_error']);
-
 const keyOf = (event, command) => `${event}\u0000${command}`;
 
 export function analyzeHooks(facts, config, { cwds }) {
@@ -32,7 +23,7 @@ export function analyzeHooks(facts, config, { cwds }) {
       g.count++;
       if (badExit) g.exitCode = r.exitCode;
       g.problemType = r.problemType ?? g.problemType;
-      if (VERIFIED_PROBLEM_TYPES.has(r.problemType)) g.stderr = r.stderr ?? g.stderr;
+      g.stderr = r.stderr ?? g.stderr;
       g.last = later(g.last, r.ts);
       failures.set(key, g);
     }

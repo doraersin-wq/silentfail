@@ -35,3 +35,7 @@ Write 30 to 80 lines each. Every file also includes some normal, valid entries s
 8. `08-secrets-in-hooks.jsonl`: failing hooks (non-zero `exitCode`, `hookErrors`, and other `hook_*` problem types) whose `command` and `stderr` contain the fake key, Bearer tokens, `API_KEY=...`, and long hex strings.
 
 Finally, write `test/fixtures/forged/README.md` with one line per file saying what it attacks.
+
+## Self-check before finishing
+
+Write a short throwaway script (don't save it) that parses every line of every file you wrote and fails if `CANARY_DO_NOT_PRINT` appears in any of these fields: `type`, `subtype`, `sessionId`, `cwd`, `timestamp`, `version`, `attachment.type`, `attachment.hookEvent`, `attachment.hookName`, `attachment.command`, `attachment.stderr`, the MCP server lists, `addedNames`/`readdedNames`, `hookInfos`, `hookErrors`, or any `tool_use.name`. Fix every hit before you finish. silentfail prints those fields, so only the fake key may appear there.
