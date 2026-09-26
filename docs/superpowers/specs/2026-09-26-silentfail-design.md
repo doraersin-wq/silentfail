@@ -290,3 +290,45 @@ or blocks. If the Pro usage limit interrupts it, it resumes when the user says
 - A weekly agent that runs the test suite against the newest Claude Code logs
   to catch format changes.
 - Plugin and skill enabled-versus-loaded checks.
+
+## 11. Amendments after the final review (2026-09-27)
+
+These amendments override the sections above where they conflict.
+
+**Evidence** (structure-only checks on the author's logs):
+- 565 of 2,667 tool_use ids appear in more than one log file, because resumed and forked sessions copy history.
+- The author's MCP errors are genuine tool errors. There are no rejections only because the author runs in auto mode.
+- All 21 logged SessionStart runs had output, so there's no proof that silent SessionStart hooks are logged.
+
+**MCP rules:**
+- **Rejections aren't failures.** Extractors may compare `tool_result` text against two fixed markers: the user-rejection message and `[Request interrupted by user`. A match classifies the call as rejected rather than failed, and rejected calls are left out of the MCP failure ratio. The text itself is never stored or printed.
+- **Duplicate calls count once.** Tool calls pair by their globally unique `tool_use` id, and each MCP call is counted once, so copied history can't double-count.
+- **Server keys** replace every character outside `[A-Za-z0-9_-]` with `_`, matching how Claude Code builds tool names.
+- **`mcp-failed-connect`** ignores sessions where the server connected later in the same session.
+- **`mcp-never-seen` has three new limits:**
+  - It respects project `.mcp.json` approval (`enableAllProjectMcpServers`, `enabledMcpjsonServers`, `disabledMcpjsonServers`).
+  - It becomes `unknown` when the window has no connection-status evidence at all.
+  - It's skipped when there are no sessions. The report then says `No Claude Code session logs in the last N days.`
+
+**Hook rules:**
+- **Failures are graded against runs.** A hook failure is `broken` if its latest run failed or at least 50% of its runs failed. Otherwise it's a `warning` ("failed X of N runs").
+- **Intentional blocks aren't failures:** exit code 2 and `hook_blocking_error`. Only `hook_*` types matching `error` or `cancel` are problems. Other `hook_*` types count as unrecognized.
+- **`hook-never-ran` applies to Stop hooks only.** A configured SessionStart hook with no logged run is `unknown`. Non-command hooks (prompt or agent) are `unknown` with a message that says so.
+- **Commands from the logs are trimmed** before matching.
+
+**Redaction and output:**
+- The home folder is shown as `~`.
+- The redactor also catches:
+  - quoted and colon-separated `key: value` pairs
+  - `--token value` flags
+  - `Authorization: token|basic …`
+  - URL userinfo (`user:pass@`)
+- ANSI and control characters are stripped.
+- Report fields can't span lines.
+- Hook commands print only for broken and warning findings, or for everything with `--all`.
+
+**Robustness:**
+- The `stat` race is guarded.
+- A settings file with a UTF-8 BOM parses.
+- Only absolute log cwds are used as project paths.
+- Distinct unrecognized shapes are capped at 200.
