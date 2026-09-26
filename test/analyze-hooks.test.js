@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TRACED_EVENTS, analyzeHooks } from '../src/analyze/hooks.js';
+import { TRACED_EVENTS, analyzeHooks, createHookAnalyzer } from '../src/analyze/hooks.js';
 
 const run = fields => ({ kind: 'hook-run', event: 'SessionStart', command: 'start.sh', exitCode: 0, durationMs: 100, stderr: null, problemType: null, sessionId: 's1', cwd: '/w/p', ts: '2026-09-20T10:00:00.000Z', ...fields });
 const hook = fields => ({ event: 'SessionStart', matcher: null, type: 'command', command: 'start.sh', scope: 'user', project: null, source: 'settings.json', plugin: null, ...fields });
@@ -47,6 +47,17 @@ test('failed runs are broken, grouped by event and command, with the latest stde
   assert.equal(findings[0].evidence.stderr, 'second');
   assert.equal(findings[0].evidence.command, 'start.sh');
   assert.equal(findings[0].evidence.last, '2026-09-21T10:00:00.000Z');
+});
+
+test('createHookAnalyzer fed one fact at a time matches analyzeHooks', () => {
+  const facts = [
+    run({ exitCode: 1, stderr: 'first' }),
+    run({ exitCode: 1, stderr: 'second', ts: '2026-09-21T10:00:00.000Z' }),
+    run({ event: 'Stop', command: 'app-hook', exitCode: null, problemType: 'stop_hook_error', stderr: 'died' }),
+  ];
+  const analyzer = createHookAnalyzer();
+  for (const f of facts) analyzer.add(f);
+  assert.deepEqual(analyzer.finish(none, ctx), analyzeHooks(facts, none, ctx));
 });
 
 test('a configured hook that failed is reported once, as broken', () => {

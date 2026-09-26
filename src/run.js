@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { analyzeHooks } from './analyze/hooks.js';
-import { analyzeMcp } from './analyze/mcp.js';
+import { createHookAnalyzer } from './analyze/hooks.js';
+import { createMcpAnalyzer } from './analyze/mcp.js';
 import { createExtractor } from './extract/index.js';
 import { loadConfig } from './sources/config.js';
 import { findLogFiles, readEntries } from './sources/logs.js';
@@ -21,11 +21,12 @@ export async function run({ env = process.env, days = 14, now = Date.now() } = {
   const counters = { badLines: 0 };
   const warnings = [];
   const { extract, state } = createExtractor();
-  const facts = [];
+  const mcp = createMcpAnalyzer();
+  const hooks = createHookAnalyzer();
   for (const file of files) {
     try {
       for await (const { entry } of readEntries(file, counters)) {
-        for (const fact of extract(entry)) facts.push(fact);
+        for (const fact of extract(entry)) { mcp.add(fact); hooks.add(fact); }
       }
     } catch (err) {
       warnings.push(`could not read ${file} (${err.code ?? err.message})`);
@@ -35,7 +36,7 @@ export async function run({ env = process.env, days = 14, now = Date.now() } = {
   const config = await loadConfig({ env, projectPaths: [...state.cwds] });
   warnings.push(...config.warnings);
   const context = { cwds: state.cwds };
-  const findings = [...analyzeMcp(facts, config, context), ...analyzeHooks(facts, config, context)]
+  const findings = [...mcp.finish(config, context), ...hooks.finish(config, context)]
     .sort((a, b) => ORDER[a.severity] - ORDER[b.severity] || a.subject.localeCompare(b.subject));
 
   return {

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isInside, later } from '../src/analyze/common.js';
-import { analyzeMcp } from '../src/analyze/mcp.js';
+import { analyzeMcp, createMcpAnalyzer } from '../src/analyze/mcp.js';
 import { plural } from '../src/format.js';
 
 const call = (server, ok, sessionId = 's1', ts = '2026-09-20T10:00:00.000Z') => ({ kind: 'mcp-call', server, name: server, ok, sessionId, cwd: '/w/p', ts });
@@ -46,6 +46,18 @@ test('connection problems are counted per session', () => {
     ['mcp-stuck-pending', 'warning', 'MCP slow', 'never finished connecting in 1 of 1 session'],
     ['mcp-ok', 'ok', 'MCP slow2', 'connected in 1 of 1 session'],
   ]);
+});
+
+test('createMcpAnalyzer fed one fact at a time matches analyzeMcp', () => {
+  const facts = [
+    status('broken', 'failed', 's1'), status('broken', 'failed', 's2'),
+    status('cf', 'needs-auth', 's1', 'plugin:cf:cf'), status('cf', 'needs-auth', 's2', 'plugin:cf:cf'), status('cf', 'connected', 's2', 'plugin:cf:cf'),
+    status('slow', 'pending', 's1'),
+    status('slow2', 'pending', 's1'), status('slow2', 'connected', 's1'),
+  ];
+  const analyzer = createMcpAnalyzer();
+  for (const f of facts) analyzer.add(f);
+  assert.deepEqual(analyzer.finish(noConfig, ctx), analyzeMcp(facts, noConfig, ctx));
 });
 
 test('configured labels win over names from the logs', () => {
