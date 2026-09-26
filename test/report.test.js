@@ -71,3 +71,10 @@ test('json report is redacted, object keys included', () => {
   assert.equal(json.days, 14);
   assert.equal(json.findings.length, 6);
 });
+
+test('json report cuts stderr to its first line and 120 characters, like the text report', () => {
+  const json = JSON.parse(renderJson(result, { days: 14 }));
+  assert.equal(json.findings[1].evidence.stderr, 'boom [redacted]');
+  const long = { ...result, findings: [{ ...result.findings[1], evidence: { ...result.findings[1].evidence, stderr: 'e'.repeat(300) } }] };
+  assert.equal(JSON.parse(renderJson(long, { days: 14 })).findings[0].evidence.stderr.length, 120);
+});
