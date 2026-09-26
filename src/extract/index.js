@@ -10,7 +10,7 @@ const INTERNED_FIELDS = ['sessionId', 'cwd', 'server', 'name', 'event', 'command
 
 // Runs every extractor over a stream of log entries and keeps run-wide counters.
 export function createExtractor() {
-  const ctx = { toolNames: new Map() };
+  const ctx = { toolNames: new Map(), countedMcp: new Set() };
   const pool = new Map();
   const state = { sessions: new Set(), cwds: new Set(), unrecognized: new Map(), versions: { min: null, max: null } };
 

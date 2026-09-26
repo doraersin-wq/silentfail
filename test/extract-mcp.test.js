@@ -5,6 +5,7 @@ import { extractMcpCalls } from '../src/extract/mcpCalls.js';
 import { extractMcpStatus } from '../src/extract/mcpStatus.js';
 
 const base = { sessionId: 's1', cwd: '/w/p', timestamp: '2026-09-20T10:00:00.000Z' };
+const newCtx = () => ({ toolNames: new Map(), countedMcp: new Set() });
 
 test('serverFromToolName reads the server out of mcp__server__tool', () => {
   assert.equal(serverFromToolName('mcp__filesystem__read_file'), 'filesystem');
@@ -14,9 +15,23 @@ test('serverFromToolName reads the server out of mcp__server__tool', () => {
   assert.equal(serverFromToolName(42), null);
 });
 
-test('serverKey makes plugin:x:y and plugin_x_y the same key', () => {
+test('serverKey matches Claude Code\'s tool-name normalization', () => {
   assert.equal(serverKey('plugin:cloudflare:cloudflare'), 'plugin_cloudflare_cloudflare');
   assert.equal(serverKey('filesystem'), 'filesystem');
+  assert.equal(serverKey('claude.ai Gmail'), 'claude_ai_Gmail');
+});
+
+test('mcp-status and mcp-call facts agree on the server key for a name with odd characters', () => {
+  const [status] = extractMcpStatus({
+    ...base,
+    type: 'attachment',
+    attachment: { type: 'deferred_tools_delta', needsAuthMcpServers: ['claude.ai Gmail'] },
+  });
+  const ctx = newCtx();
+  extractMcpCalls({ ...base, message: { content: [{ type: 'tool_use', id: 'g1', name: 'mcp__claude_ai_Gmail__search' }] } }, ctx);
+  const [call] = extractMcpCalls({ ...base, message: { content: [{ type: 'tool_result', tool_use_id: 'g1' }] } }, ctx);
+  assert.equal(status.server, 'claude_ai_Gmail');
+  assert.equal(call.server, 'claude_ai_Gmail');
 });
 
 test('extractMcpStatus reports failed, needs-auth, pending and connected servers', () => {
@@ -54,7 +69,7 @@ test('extractMcpStatus ignores other entries and junk list items', () => {
 });
 
 test('extractMcpCalls pairs tool_use with tool_result and flags errors', () => {
-  const ctx = { toolNames: new Map() };
+  const ctx = newCtx();
   const fromUse = extractMcpCalls({
     ...base,
     type: 'assistant',
@@ -73,19 +88,48 @@ test('extractMcpCalls pairs tool_use with tool_result and flags errors', () => {
       { type: 'tool_result', tool_use_id: 't2', content: 'ok' },
     ] },
   }, ctx);
-  assert.deepEqual(fromResult.map(f => [f.kind, f.server, f.ok]), [['mcp-call', 'filesystem', false]]);
+  assert.deepEqual(fromResult.map(f => [f.kind, f.server, f.ok, f.rejected]), [['mcp-call', 'filesystem', false, false]]);
   assert.equal(ctx.toolNames.size, 0);
 });
 
-test('extractMcpCalls keeps sessions apart and reports orphan results', () => {
-  const ctx = { toolNames: new Map() };
+test('rejections and interruptions are not failures', () => {
+  const ctx = newCtx();
+  extractMcpCalls({
+    ...base,
+    message: { content: [
+      { type: 'tool_use', id: 'r1', name: 'mcp__fs__read' },
+      { type: 'tool_use', id: 'r2', name: 'mcp__fs__read' },
+    ] },
+  }, ctx);
+  const facts = extractMcpCalls({
+    ...base,
+    message: { content: [
+      { type: 'tool_result', tool_use_id: 'r1', is_error: true, content: "The user doesn't want to proceed with this tool use." },
+      { type: 'tool_result', tool_use_id: 'r2', is_error: true, content: [{ type: 'text', text: '[Request interrupted by user] more text' }] },
+    ] },
+  }, ctx);
+  assert.deepEqual(facts.map(f => [f.ok, f.rejected]), [[false, true], [false, true]]);
+  for (const f of facts) assert.equal('text' in f, false);
+});
+
+test('pairs by tool id across sessions and counts a copied call once', () => {
+  const ctx = newCtx();
   extractMcpCalls({ ...base, sessionId: 'a', message: { content: [{ type: 'tool_use', id: 't1', name: 'mcp__x__y' }] } }, ctx);
-  const facts = extractMcpCalls({ ...base, sessionId: 'b', message: { content: [{ type: 'tool_result', tool_use_id: 't1' }] } }, ctx);
+  const factsA = extractMcpCalls({ ...base, sessionId: 'a', message: { content: [{ type: 'tool_result', tool_use_id: 't1' }] } }, ctx);
+  extractMcpCalls({ ...base, sessionId: 'b', message: { content: [{ type: 'tool_use', id: 't1', name: 'mcp__x__y' }] } }, ctx);
+  const factsB = extractMcpCalls({ ...base, sessionId: 'b', message: { content: [{ type: 'tool_result', tool_use_id: 't1' }] } }, ctx);
+  assert.deepEqual(factsA.map(f => f.kind), ['mcp-call']);
+  assert.deepEqual(factsB, []);
+});
+
+test('extractMcpCalls reports an orphan result whose id was never seen', () => {
+  const ctx = newCtx();
+  const facts = extractMcpCalls({ ...base, sessionId: 'a', message: { content: [{ type: 'tool_result', tool_use_id: 'never-seen' }] } }, ctx);
   assert.deepEqual(facts.map(f => f.kind), ['orphan-result']);
 });
 
 test('extractMcpCalls survives odd message shapes', () => {
-  const ctx = { toolNames: new Map() };
+  const ctx = newCtx();
   for (const entry of [{}, { message: 'text' }, { message: { content: 'text' } }, { message: { content: [null, 3, 'x', { type: 'tool_use' }] } }]) {
     assert.deepEqual(extractMcpCalls(entry, ctx), []);
   }

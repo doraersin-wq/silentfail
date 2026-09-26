@@ -14,8 +14,11 @@ export function serverFromToolName(name) {
   return match ? match[1] : null;
 }
 
-// Status lists spell plugin servers plugin:<plugin>:<server>, and tool names use
-// underscores. One key covers both spellings.
+// Claude Code turns server names into tool-name pieces by replacing every
+// character outside [A-Za-z0-9_-] with '_' (so "claude.ai Gmail" becomes
+// "claude_ai_Gmail", matching mcp__claude_ai_Gmail__search). Status lists spell
+// plugin servers plugin:<plugin>:<server>; this same rule folds that into the
+// same key tool names use.
 export function serverKey(name) {
-  return String(name).replace(/:/g, '_');
+  return String(name).replace(/[^A-Za-z0-9_-]/g, '_');
 }

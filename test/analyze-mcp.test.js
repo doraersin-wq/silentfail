@@ -20,6 +20,12 @@ test('plural, later and isInside basics', () => {
   assert.ok(!isInside('/w/pp', '/w/p'));
 });
 
+test('rejected and interrupted calls are not counted at all', () => {
+  const rejected = { kind: 'mcp-call', server: 'fs', name: 'fs', ok: false, rejected: true, sessionId: 's1', cwd: '/w/p', ts: '2026-09-20T10:00:00.000Z' };
+  const facts = [rejected, rejected, call('fs', true)];
+  assert.deepEqual(pick(analyzeMcp(facts, noConfig, ctx)), [['mcp-ok', 'ok', 'MCP fs', '1 call, 0 failed']]);
+});
+
 test('2 of 2 failed calls is broken, with the last error time', () => {
   const findings = analyzeMcp([call('filesystem', false), call('filesystem', false, 's1', '2026-09-23T08:00:00.000Z')], noConfig, ctx);
   assert.deepEqual(pick(findings), [['mcp-call-errors', 'broken', 'MCP filesystem', '2 of 2 calls failed']]);

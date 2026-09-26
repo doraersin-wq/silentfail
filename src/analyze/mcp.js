@@ -23,6 +23,7 @@ export function createMcpAnalyzer() {
         else if (f.state === 'pending') s.pending.add(sid);
         else if (f.state === 'connected') s.connected.add(sid);
       } else if (f.kind === 'mcp-call') {
+        if (f.rejected) return;
         const s = get(f.server, f.name);
         s.calls++;
         if (!f.ok) {
