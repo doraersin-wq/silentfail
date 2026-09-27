@@ -34,7 +34,7 @@ test('the skill frontmatter names it, describes it and pre-approves node', () =>
   const { front } = skill();
   assert.equal(front.name, 'silentfail');
   assert.ok(front.description.length > 40);
-  assert.match(front['allowed-tools'], /Bash\(node \*\)/);
+  assert.equal(front['allowed-tools'], 'Bash(node *silentfail*cli.js* --json --exit-zero)');
 });
 
 test('the skill pre-runs exactly the bundled CLI with --json --exit-zero', () => {

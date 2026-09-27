@@ -37,6 +37,7 @@ OK: 25 MCP servers, 1 hook (--all to list)
 - It reads Claude Code's own session logs (`~/.claude/projects`) and your config files. It never prints your conversations.
 - Anything that looks like a key or token is blanked out before it's printed. This is best effort, so glance over a report before sharing it.
 - For a failing hook it prints the hook's command and the first line of its error output, after blanking.
+- For MCP servers with problems, it prints the server's command and arguments from your config, with secrets blanked, so you can debug them.
 
 ## Options
 
@@ -60,7 +61,7 @@ silentfail is also a Claude Code plugin. Install it once:
 
 From a local clone, use `/plugin marketplace add ./silentfail` instead.
 
-Then type `/silentfail` in any session. The report runs on your machine, and Claude walks you through each problem and how to fix it. It asks before changing anything. Claude sees the report, not your session logs.
+Then type `/silentfail` in any session. The report runs on your machine, and Claude walks you through each problem and how to fix it. It asks before changing anything. Claude sees the report, not your session logs. It needs Node 22 or newer on your PATH.
 
 ## How it works
 
@@ -74,8 +75,10 @@ silentfail looks back at what actually happened. It works alongside:
 |---|---|
 | `/doctor` (built into Claude Code) | Checking and cleaning up your config and context size |
 | silentfail | Finding what actually failed, from your session history |
-| [MCP Inspector](https://github.com/modelcontextprotocol/inspector) | Debugging one server live. silentfail prints the exact command for each broken server |
+| [MCP Inspector](https://github.com/modelcontextprotocol/inspector) | Debugging one server live. For broken or failing servers started from a command in your config, silentfail prints the exact command. Plugin and URL servers are skipped. |
 | [ccusage](https://github.com/ryoppippi/ccusage) | Seeing what Claude Code cost you |
+
+The `debug live` commands are written for bash, zsh or Git Bash. In PowerShell, `${NAME}` refers to a PowerShell variable rather than an environment variable.
 
 ## Limitations
 
