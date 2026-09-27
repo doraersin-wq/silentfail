@@ -12,7 +12,7 @@
 
 **Execution notes:**
 - Implementers run on Sonnet 5 and the controller on Opus 5.5.
-- Task 3 is controller-only.
+- Task 5 is controller-only. Tasks 3-4 were added mid-run by the spec amendment (§6).
 - The machine is Windows 10 with Git Bash and Node 22.22. 105 tests pass before Task 1.
 
 ## Global Constraints
@@ -288,7 +288,240 @@ git commit -m "feat: Claude Code plugin with the /silentfail skill" -m "Co-Autho
 
 ---
 
-### Task 3: Official validation and live check (controller only)
+### Task 3: MCP Inspector hand-off
+
+**Files:**
+- Create: `src/analyze/inspect.js`, `test/inspect.test.js`
+- Modify:
+  - `src/sources/config.js`: `addServers` records `command` and `args`
+  - `src/analyze/mcp.js`: `finish` attaches `evidence.inspect`
+  - `src/report/text.js`: a `debug live:` detail line
+- Test: `test/inspect.test.js`, `test/analyze-mcp.test.js`, `test/report.test.js`
+
+**Interfaces:**
+- Consumes: `Config.mcpServers` entries (`key`, `label`, `scope`, `project`, `source`, `enabled`).
+- Produces:
+  - `inspectorCommand(server): string | null`
+  - `Config.mcpServers[i].command: string | null`
+  - `Config.mcpServers[i].args: string[]`
+  - `Finding.evidence.inspect?: string`
+
+- [ ] **Step 1: Write the failing tests**
+
+`test/inspect.test.js`:
+
+```js
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { inspectorCommand } from '../src/analyze/inspect.js';
+
+test('builds the MCP Inspector command for a stdio server', () => {
+  assert.equal(
+    inspectorCommand({ command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/work/dir'] }),
+    'npx @modelcontextprotocol/inspector npx -y @modelcontextprotocol/server-filesystem /work/dir',
+  );
+});
+
+test('quotes arguments that need it', () => {
+  assert.equal(
+    inspectorCommand({ command: 'node', args: ['C:/My Tools/server.js', 'a"b'] }),
+    'npx @modelcontextprotocol/inspector node "C:/My Tools/server.js" "a\\"b"',
+  );
+});
+
+test('returns null when there is nothing runnable to hand off', () => {
+  assert.equal(inspectorCommand({ command: null, args: [] }), null);
+  assert.equal(inspectorCommand({ command: 'node', args: ['${CLAUDE_PLUGIN_ROOT}/s.js'] }), null);
+  assert.equal(inspectorCommand(undefined), null);
+});
+```
+
+Append to `test/analyze-mcp.test.js`. It uses that file's existing `call`, `status` and `ctx` helpers:
+
+```js
+test('broken and never-seen servers carry an MCP Inspector command from the config', () => {
+  const cfg = { hooks: [], mcpServers: [
+    { key: 'fs', label: 'fs', scope: 'project', project: '/w/p', source: 'x', enabled: true, command: 'npx', args: ['-y', 'fs-server'] },
+    { key: 'ghost', label: 'ghost', scope: 'user', project: null, source: 'y', enabled: true, command: 'node', args: ['ghost.js'] },
+  ] };
+  const facts = [status('fs', 'connected'), call('fs', false), call('fs', false), status('other', 'connected')];
+  const findings = analyzeMcp(facts, cfg, ctx);
+  assert.equal(findings.find(f => f.id === 'mcp-call-errors').evidence.inspect, 'npx @modelcontextprotocol/inspector npx -y fs-server');
+  assert.equal(findings.find(f => f.id === 'mcp-never-seen').evidence.inspect, 'npx @modelcontextprotocol/inspector node ghost.js');
+});
+
+test('needs-auth and ok findings carry no Inspector command', () => {
+  const cfg = { hooks: [], mcpServers: [{ key: 'cf', label: 'cf', scope: 'user', project: null, source: 'x', enabled: true, command: 'node', args: ['cf.js'] }] };
+  const [f] = analyzeMcp([status('cf', 'needs-auth')], cfg, ctx);
+  assert.equal(f.id, 'mcp-needs-auth');
+  assert.equal(f.evidence.inspect, undefined);
+});
+```
+
+Append to `test/report.test.js`:
+
+```js
+test('broken MCP findings print the MCP Inspector command, redacted', () => {
+  const out = renderText({
+    findings: [{ id: 'mcp-call-errors', severity: 'broken', subject: 'MCP fs', message: '2 of 2 calls failed', evidence: { inspect: 'npx @modelcontextprotocol/inspector npx -y fs-server --token sk-ant-FAKE0000000000000000' } }],
+    stats: { files: 1, sessions: 1, badLines: 0, unrecognized: {}, versions: { min: null, max: null }, warnings: [] },
+  }, { days: 14 });
+  assert.match(out, /debug live: npx @modelcontextprotocol\/inspector npx -y fs-server --token \[redacted\]/);
+  assert.ok(!out.includes('sk-ant-FAKE'));
+});
+```
+
+- [ ] **Step 2: Run them and confirm they fail**
+
+Run: `node --test test/inspect.test.js test/analyze-mcp.test.js test/report.test.js`
+Expected: FAIL. `inspect.js` is missing, `evidence.inspect` is undefined, and there's no `debug live:` line.
+
+- [ ] **Step 3: Create `src/analyze/inspect.js`**
+
+```js
+// Builds the MCP Inspector command that debugs one configured stdio server live.
+// Returns null when there is nothing runnable to hand off: URL servers, or plugin
+// servers whose ${CLAUDE_PLUGIN_ROOT} paths only resolve inside Claude Code.
+const SAFE = /^[A-Za-z0-9_@%+=:,./\\-]+$/;
+
+export function inspectorCommand(server) {
+  if (!server || typeof server.command !== 'string' || server.command === '') return null;
+  const parts = [server.command, ...(Array.isArray(server.args) ? server.args : [])];
+  if (parts.some(p => p.includes('${'))) return null;
+  return ['npx', '@modelcontextprotocol/inspector', ...parts.map(quote)].join(' ');
+}
+
+function quote(arg) {
+  return SAFE.test(arg) ? arg : `"${arg.replace(/(["$`])/g, '\\$1')}"`;
+}
+```
+
+- [ ] **Step 4: Record `command` and `args` in `src/sources/config.js`**
+
+Replace the body of `addServers` with the version below. `obj` and `list` are the helpers already defined in this file.
+
+```js
+  const addServers = (servers, scope, project, source, plugin = null, isEnabled = () => true) => {
+    for (const [name, cfg] of Object.entries(obj(servers))) {
+      const label = plugin ? `plugin:${plugin}:${name}` : name;
+      if (plugin && mcpServers.some(s => s.label === label)) continue;
+      const spec = obj(cfg);
+      mcpServers.push({
+        key: serverKey(label), label, scope, project, source, enabled: isEnabled(name),
+        command: typeof spec.command === 'string' ? spec.command : null,
+        args: list(spec.args).filter(a => typeof a === 'string'),
+      });
+    }
+  };
+```
+
+If an existing test in `test/config.test.js` compares whole server objects with `deepEqual`, add the new `command`/`args` fields to its expected objects. That's the only allowed change to existing expectations.
+
+- [ ] **Step 5: Attach `evidence.inspect` in `src/analyze/mcp.js`**
+
+1. Add this import: `import { inspectorCommand } from './inspect.js';`
+2. In `finish`, directly after the label-override loop, add:
+
+```js
+      const withInspect = (evidence, key) => {
+        const c = config.mcpServers.find(x => x.key === key);
+        const inspect = c ? inspectorCommand(c) : null;
+        return inspect ? { ...evidence, inspect } : evidence;
+      };
+```
+
+3. Change `for (const s of servers.values()) {` to `for (const [key, s] of servers) {`.
+4. Wrap the evidence object of these findings in `withInspect(<evidence>, key)`:
+   - `mcp-failed-connect`
+   - `mcp-call-errors`
+   - `mcp-stuck-pending`
+5. Don't wrap `mcp-needs-auth` or `mcp-ok`.
+6. In the never-seen loop, change `{ scope: c.scope, source: c.source }` to `withInspect({ scope: c.scope, source: c.source }, c.key)`.
+
+- [ ] **Step 6: Print the `debug live:` line in `src/report/text.js`**
+
+Directly after the `stderr:` detail line, add:
+
+```js
+      if (showDetail && f.evidence?.inspect) lines.push(`      debug live: ${redactLine(f.evidence.inspect, 200)}`);
+```
+
+- [ ] **Step 7: Run the tests and confirm they pass**
+
+Run: `node --test test/inspect.test.js test/analyze-mcp.test.js test/report.test.js test/config.test.js`, then `npm test`
+Expected: PASS, with 118 tests in total (112 + 6).
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/analyze/inspect.js src/sources/config.js src/analyze/mcp.js src/report/text.js test/inspect.test.js test/analyze-mcp.test.js test/report.test.js test/config.test.js
+git commit -m "feat: hand broken MCP servers off to MCP Inspector" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 4: Pair with `/doctor` and ccusage (docs and skill)
+
+**Files:**
+- Modify: `skills/silentfail/SKILL.md`, `README.md`
+- Test: `test/plugin.test.js` (one new test)
+
+**Interfaces:**
+- Consumes: `evidence.inspect` from Task 3.
+- Produces: nothing code-facing.
+
+- [ ] **Step 1: Write the failing test** (append to `test/plugin.test.js`)
+
+```js
+test('the skill offers the Inspector command and points config cleanup to /doctor', () => {
+  const { body } = skill();
+  assert.match(body, /`inspect` command/);
+  assert.match(body, /\/doctor/);
+});
+```
+
+- [ ] **Step 2: Run it and confirm it fails**
+
+Run: `node --test test/plugin.test.js`
+Expected: FAIL. No `inspect` command mention and no `/doctor`.
+
+- [ ] **Step 3: Add two steps to the end of the numbered list in `skills/silentfail/SKILL.md`**
+
+```markdown
+9. If a finding's evidence has an `inspect` command, offer it as the way to debug that server live with MCP Inspector. The user runs it, and it opens a local page.
+10. silentfail covers what actually failed at runtime. For configuration and context-size cleanup, suggest Claude Code's built-in `/doctor` rather than auditing the config yourself.
+```
+
+- [ ] **Step 4: Add a README section directly after `## How it works` and its paragraph**
+
+```markdown
+## How it fits with other tools
+
+silentfail looks back at what actually happened. It works alongside:
+
+| Tool | Use it for |
+|---|---|
+| `/doctor` (built into Claude Code) | Checking and cleaning up your config and context size |
+| silentfail | Finding what actually failed, from your session history |
+| [MCP Inspector](https://github.com/modelcontextprotocol/inspector) | Debugging one server live. silentfail prints the exact command for each broken server |
+| [ccusage](https://github.com/ryoppippi/ccusage) | Seeing what Claude Code cost you |
+```
+
+- [ ] **Step 5: Run the tests and confirm they pass**
+
+Run: `node --test test/plugin.test.js`, then `npm test`
+Expected: PASS, with 119 tests in total.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add skills/silentfail/SKILL.md README.md test/plugin.test.js
+git commit -m "docs: pair silentfail with /doctor, MCP Inspector and ccusage" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 5: Official validation and live check (controller only)
 
 **Files:** none changed unless validation reports a problem. If it does, a fix goes through an implementer and review.
 
