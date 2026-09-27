@@ -1,7 +1,7 @@
 # silentfail v0.2: Claude Code plugin and `/silentfail`
 
 **Date:** 2026-09-27
-**Status:** Awaiting user review
+**Status:** Approved 2026-09-27
 **Builds on:** `2026-09-26-silentfail-design.md` (v0.1, shipped)
 
 ## 1. Purpose
