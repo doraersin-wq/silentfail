@@ -173,3 +173,32 @@ Test-first, using `node --test` as in v0.1.
 | `node` isn't on the PATH Claude Code uses | Claude Code users already run Node-based tooling. If the pre-run fails, step 1 of the skill reports it plainly |
 | Report JSON size | The JSON lists every finding, OK rows included. On the author's machine that's about 30 findings, a few KB, which fits comfortably in a prompt |
 | `<github-user>` in the README isn't known yet | The GitHub account doesn't exist yet. The local-clone command works today, and the GitHub one is filled in when the repo is created |
+
+## 6. Amendment: build on existing tools (2026-09-27)
+
+A competitive scan found no tool that reports, with zero setup and looking back over the session history, which MCP servers and hooks actually failed. The nearby tools are:
+- **`/doctor`** (built in): config and context audit.
+- **MCP Inspector:** live, one server at a time.
+- **MCP Doctor and health-check skills:** live probes.
+- **ccusage and log viewers:** cost and transcripts.
+- **Hook dashboards:** live, and only after setup.
+- **Claude Code OpenTelemetry:** needs a collector, and only works going forward.
+
+silentfail adds to these tools rather than duplicating them. All of the following are free:
+
+1. **MCP Inspector hand-off.**
+   - `loadConfig` also records each server's `command` (string or null) and `args` (string array).
+   - A new `src/analyze/inspect.js` builds the command `npx @modelcontextprotocol/inspector <command> <args…>`:
+     - an argument that contains anything other than `[A-Za-z0-9_@%+=:,./\-]` is double-quoted, with `"`, `$` and backtick escaped
+     - it returns null for servers without a command (URL servers), and for any part containing `${`, since plugin-internal paths only resolve inside Claude Code
+   - The command goes into `evidence.inspect` of `mcp-failed-connect`, `mcp-call-errors`, `mcp-stuck-pending` and `mcp-never-seen`. It does NOT go into `mcp-needs-auth` (the fix there is logging in) or `mcp-ok`.
+   - The text report prints `debug live: <command>` (redacted, up to 200 characters) under broken and warning findings, or under any finding with `--all`.
+2. **Pair with `/doctor`.**
+   - A new skill step tells Claude that silentfail covers runtime failures, and to suggest `/doctor` for config and context cleanup instead of auditing config itself.
+   - Another new step tells Claude to offer the `inspect` command as the way to debug a server live.
+   - silentfail will never add static config linting, because `/doctor` owns that.
+3. **Pair with ccusage.**
+   - The README gets a "How it fits with other tools" table covering `/doctor`, silentfail, MCP Inspector and ccusage.
+   - Launch line: "ccusage shows what Claude Code cost you. silentfail shows what silently broke."
+4. **Roadmap for piece C (not built in v0.2):** the hook tracer should read the hook events that Claude Code's built-in OpenTelemetry records, instead of wrapping hook commands and editing settings.
+   - Before designing C, verify two things: that those events include hook runs, and that a free local OpenTelemetry Collector with a file exporter can capture them.
