@@ -202,3 +202,9 @@ silentfail adds to these tools rather than duplicating them. All of the followin
    - Launch line: "ccusage shows what Claude Code cost you. silentfail shows what silently broke."
 4. **Roadmap for piece C (not built in v0.2):** the hook tracer should read the hook events that Claude Code's built-in OpenTelemetry records, instead of wrapping hook commands and editing settings.
    - Before designing C, verify two things: that those events include hook runs, and that a free local OpenTelemetry Collector with a file exporter can capture them.
+
+**Amendment to §6.1 (2026-09-27, after the Task 3 review and a real-machine run):**
+- **Hand-off skips:** `inspectorCommand` returns null only for plugin-scope servers, or for parts that reference `${CLAUDE_PLUGIN_ROOT}` or `${CLAUDE_PLUGIN_DATA}`.
+- **Other `${VAR}` references** are printed literally, inside double quotes with `$` left unescaped when it's followed by `{`, so bash and zsh expand them the way Claude Code does. Their values are never read.
+- **Backslashes are no longer "safe" characters,** so Windows paths get quoted.
+- **Project `.mcp.json` approval, correcting v0.1 spec §11:** a server counts as disabled only when it's listed in `disabledMcpjsonServers`. On a real machine, a server with empty approval lists loaded and ran, so `enabledMcpjsonServers` and `enableAllProjectMcpServers` aren't reliable signals.
