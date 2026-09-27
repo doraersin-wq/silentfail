@@ -109,3 +109,33 @@ test('broken MCP findings print the MCP Inspector command, redacted', () => {
   assert.match(out, /debug live: npx @modelcontextprotocol\/inspector npx -y fs-server --token \[redacted\]/);
   assert.ok(!out.includes('sk-ant-FAKE'));
 });
+
+// F7: the same inspect command, shared by two findings for the same subject,
+// is printed at most once per report.
+test('the same debug live command is printed only once per report', () => {
+  const same = 'npx @modelcontextprotocol/inspector node s.js';
+  const out = renderText({
+    findings: [
+      { id: 'mcp-call-errors', severity: 'broken', subject: 'MCP fs', message: '2 of 2 calls failed', evidence: { inspect: same } },
+      { id: 'mcp-failed-connect', severity: 'broken', subject: 'MCP fs', message: 'failed to connect in 1 of 1 session', evidence: { inspect: same } },
+    ],
+    stats: { files: 1, sessions: 1, badLines: 0, unrecognized: {}, versions: { min: null, max: null }, warnings: [] },
+  }, { days: 14 });
+  const debugLines = out.split('\n').filter(l => l.includes('debug live:'));
+  assert.equal(debugLines.length, 1);
+});
+
+// F8: an unknown finding's inspect command is only shown with --all, matching
+// the existing command/stderr behavior for unknown findings.
+test('an unknown finding with an inspect command does not print debug live unless --all', () => {
+  const withInspect = {
+    findings: [
+      { id: 'mcp-never-seen', severity: 'unknown', subject: 'MCP ghost', message: "can't verify: these logs don't record which servers connected", evidence: { inspect: 'npx @modelcontextprotocol/inspector node ghost.js' } },
+    ],
+    stats: { files: 1, sessions: 1, badLines: 0, unrecognized: {}, versions: { min: null, max: null }, warnings: [] },
+  };
+  const out = renderText(withInspect, { days: 14 });
+  assert.ok(!out.includes('debug live:'));
+  const all = renderText(withInspect, { days: 14, all: true });
+  assert.ok(all.includes('debug live: npx @modelcontextprotocol/inspector node ghost.js'));
+});

@@ -109,19 +109,33 @@ test('empty enabledMcpjsonServers and disabledMcpjsonServers lists leave a proje
   }
 });
 
-test('project .mcp.json approval merges enableAllProjectMcpServers, enabledMcpjsonServers and disabledMcpjsonServers across sources', async () => {
+test('a project .mcp.json server is disabled only when listed in disabledMcpjsonServers, merged across ~/.claude.json\'s projects[] entry and project settings files', async () => {
   const home = makeFakeHome();
   try {
     home.write(join(home.projectDir, '.mcp.json'), { mcpServers: { a: {}, b: {}, c: {}, d: {} } });
-    // a: approved by name via ~/.claude.json's projects[] entry for this folder.
+    // a: not named in disabledMcpjsonServers anywhere, so it stays enabled;
+    // this enabledMcpjsonServers entry has no effect under the current rule.
     home.write('.claude.json', { projects: { [home.projectDir]: { enabledMcpjsonServers: ['a'] } } });
-    // c, d: approved via enableAllProjectMcpServers in project settings.json.
+    // c, d: enableAllProjectMcpServers has no effect under the current rule; they stay enabled by default.
     home.write(join(home.projectDir, '.claude', 'settings.json'), { enableAllProjectMcpServers: true });
-    // b: explicitly disabled in settings.local.json, which wins even under enableAll.
+    // b: explicitly disabled in settings.local.json, which is what actually disables it.
     home.write(join(home.projectDir, '.claude', 'settings.local.json'), { disabledMcpjsonServers: ['b'] });
     const cfg = await loadConfig({ env: home.env, projectPaths: [home.projectDir] });
     const byName = Object.fromEntries(cfg.mcpServers.map(s => [s.label, s.enabled]));
     assert.deepEqual(byName, { a: true, b: false, c: true, d: true });
+  } finally {
+    home.cleanup();
+  }
+});
+
+// F5: disabledMcpjsonServers in ~/.claude/settings.json (userSettings) also disables a project server.
+test('disabledMcpjsonServers in ~/.claude/settings.json disables a project .mcp.json server', async () => {
+  const home = makeFakeHome();
+  try {
+    home.write(join(home.projectDir, '.mcp.json'), { mcpServers: { a: {} } });
+    home.write('settings.json', { disabledMcpjsonServers: ['a'] });
+    const cfg = await loadConfig({ env: home.env, projectPaths: [home.projectDir] });
+    assert.equal(cfg.mcpServers[0].enabled, false);
   } finally {
     home.cleanup();
   }

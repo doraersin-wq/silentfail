@@ -15,6 +15,7 @@ export function renderText(result, { days, all = false, color = false }) {
   const { min, max } = stats.versions;
   const versions = min ? `, Claude Code ${min === max ? min : `${min}-${max}`}` : '';
   const lines = [`silentfail: ${plural(stats.sessions, 'session')}, last ${days} days${versions}`, ''];
+  const printedInspect = new Set();
 
   if (stats.sessions === 0) lines.push(`No Claude Code session logs in the last ${days} days.`, '');
   else if (!findings.some(f => f.severity !== 'ok')) lines.push('Nothing broken found.', '');
@@ -32,7 +33,10 @@ export function renderText(result, { days, all = false, color = false }) {
       const showDetail = all || severity === 'broken' || severity === 'warning';
       if (showDetail && f.evidence?.command) lines.push(`      command: ${redactLine(f.evidence.command)}`);
       if (showDetail && f.evidence?.stderr) lines.push(`      stderr: ${redactLine(f.evidence.stderr)}`);
-      if (showDetail && f.evidence?.inspect) lines.push(`      debug live: ${redactLine(f.evidence.inspect, 200)}`);
+      if (showDetail && f.evidence?.inspect && !printedInspect.has(f.evidence.inspect)) {
+        printedInspect.add(f.evidence.inspect);
+        lines.push(`      debug live: ${redactLine(f.evidence.inspect, 200)}`);
+      }
     }
     lines.push('');
   }

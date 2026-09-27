@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { homedir } from 'node:os';
+import { join, sep } from 'node:path';
 import { inspectorCommand } from '../src/analyze/inspect.js';
 
 test('builds the MCP Inspector command for a stdio server', () => {
@@ -44,5 +46,42 @@ test('escapes a bare $ that is not part of a ${...} reference', () => {
   assert.equal(
     inspectorCommand({ command: 'node', args: ['a$b'] }),
     'npx @modelcontextprotocol/inspector node "a\\$b"',
+  );
+});
+
+// F1: a part that starts with the home folder becomes ${HOME}, unescaped, so
+// bash/zsh/Git Bash/PowerShell expand it even though the whole arg is quoted.
+test('rewrites a home-folder prefix to the literal ${HOME}', () => {
+  assert.equal(
+    inspectorCommand({ command: 'node', args: [join(homedir(), 'mcp', 's.js')] }),
+    `npx @modelcontextprotocol/inspector node "\${HOME}${sep}mcp${sep}s.js"`,
+  );
+});
+
+test('does not rewrite a path that merely starts with the same letters as the home folder', () => {
+  const out = inspectorCommand({ command: 'node', args: [homedir() + 'x'] });
+  assert.ok(!out.includes('${HOME}'));
+});
+
+// F3: a backslash right before \, ", $, a backtick, or the end of the arg is
+// doubled first, before the existing "," `, $ escaping runs.
+test('doubles a trailing backslash inside a quoted arg', () => {
+  assert.equal(
+    inspectorCommand({ command: 'x', args: ['D:\\work\\'] }),
+    'npx @modelcontextprotocol/inspector x "D:\\work\\\\"',
+  );
+});
+
+test('doubles a backslash that precedes another backslash', () => {
+  assert.equal(
+    inspectorCommand({ command: 'x', args: ['\\\\srv\\share'] }),
+    'npx @modelcontextprotocol/inspector x "\\\\\\srv\\share"',
+  );
+});
+
+test('doubles a backslash that precedes a dollar sign, then escapes the dollar sign', () => {
+  assert.equal(
+    inspectorCommand({ command: 'x', args: ['D:\\$tmp'] }),
+    'npx @modelcontextprotocol/inspector x "D:\\\\\\$tmp"',
   );
 });

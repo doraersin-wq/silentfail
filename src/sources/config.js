@@ -32,8 +32,9 @@ const normPath = p => {
 
 // A project-scope .mcp.json server is disabled only when it's explicitly named
 // in disabledMcpjsonServers, merged across ~/.claude.json's projects[<this
-// folder>] entry and the project's own settings files. Returns a per-name check.
-function mcpApproval(globalProjects, project, projectSettingsList) {
+// folder>] entry, ~/.claude/settings.json (userSettings) and the project's own
+// settings files. Returns a per-name check.
+function mcpApproval(globalProjects, project, projectSettingsList, userSettings) {
   const disabledNames = new Set();
   const consider = settings => {
     for (const n of list(settings.disabledMcpjsonServers)) if (typeof n === 'string') disabledNames.add(n);
@@ -42,6 +43,7 @@ function mcpApproval(globalProjects, project, projectSettingsList) {
   for (const [key, entry] of Object.entries(obj(globalProjects))) {
     if (normPath(key) === target) consider(obj(entry));
   }
+  consider(obj(userSettings));
   for (const settings of projectSettingsList) consider(settings);
   return name => !disabledNames.has(name);
 }
@@ -114,7 +116,7 @@ export async function loadConfig({ env = process.env, projectPaths = [] } = {}) 
       addHooks(settings.hooks, scope, project, file);
       noteEnabled(settings);
     }
-    const isEnabled = mcpApproval(global.projects, project, projectSettings);
+    const isEnabled = mcpApproval(global.projects, project, projectSettings, userSettings);
     addServers(obj(await readJson(mcpFile, warnings)).mcpServers, 'project', project, mcpFile, null, isEnabled);
   }
 

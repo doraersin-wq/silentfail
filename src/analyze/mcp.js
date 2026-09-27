@@ -42,11 +42,21 @@ export function createMcpAnalyzer() {
         if (s) s.label = c.label;
       }
 
-      const withInspect = (evidence, key) => {
-        const c = config.mcpServers.find(x => x.key === key);
+      // A key can have more than one config entry (e.g. a user-scope server
+      // shadowed by a local-scope one for a project that ran). Only entries
+      // that are unscoped to a project, or whose project actually ran, are
+      // candidates; among those, prefer the narrowest scope first.
+      const SCOPE_ORDER = ['local', 'project', 'user', 'plugin'];
+      const pickEntry = key => {
+        const candidates = config.mcpServers.filter(c => c.key === key && (!c.project || ranInProject(cwds, c.project)));
+        candidates.sort((a, b) => SCOPE_ORDER.indexOf(a.scope) - SCOPE_ORDER.indexOf(b.scope));
+        return candidates[0] ?? null;
+      };
+      const attachInspect = (evidence, c) => {
         const inspect = c ? inspectorCommand(c) : null;
         return inspect ? { ...evidence, inspect } : evidence;
       };
+      const withInspect = (evidence, key) => attachInspect(evidence, pickEntry(key));
 
       const findings = [];
       for (const [key, s] of servers) {
@@ -88,7 +98,7 @@ export function createMcpAnalyzer() {
         const message = sawStatus
           ? `configured (${c.scope} scope) but never showed up in the logs`
           : "can't verify: these logs don't record which servers connected";
-        findings.push(finding('mcp-never-seen', severity, `MCP ${c.label}`, message, withInspect({ scope: c.scope, source: c.source }, c.key)));
+        findings.push(finding('mcp-never-seen', severity, `MCP ${c.label}`, message, attachInspect({ scope: c.scope, source: c.source }, c)));
       }
       return findings;
     },

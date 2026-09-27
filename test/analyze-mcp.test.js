@@ -127,3 +127,34 @@ test('needs-auth and ok findings carry no Inspector command', () => {
   assert.equal(f.id, 'mcp-needs-auth');
   assert.equal(f.evidence.inspect, undefined);
 });
+
+// F4: a key can have more than one config entry (e.g. a user-scope server
+// shadowed by a local-scope one for a project that actually ran). The local
+// one should win.
+test('when a key has both a user-scope and a ran local-scope entry, the Inspector command uses the local one', () => {
+  const cfg = { hooks: [], mcpServers: [
+    { key: 'fs', label: 'fs', scope: 'user', project: null, source: 'x', enabled: true, command: 'a', args: [] },
+    { key: 'fs', label: 'fs', scope: 'local', project: '/w/p', source: 'y', enabled: true, command: 'b', args: [] },
+  ] };
+  const findings = analyzeMcp([call('fs', false), call('fs', false)], cfg, ctx);
+  const f = findings.find(x => x.id === 'mcp-call-errors');
+  assert.equal(f.evidence.inspect, 'npx @modelcontextprotocol/inspector b');
+});
+
+// F8: fill test gaps for mcp-failed-connect, mcp-stuck-pending and mcp-ok.
+test('mcp-failed-connect and mcp-stuck-pending carry an Inspector command; mcp-ok does not', () => {
+  const cfg = { hooks: [], mcpServers: [
+    { key: 'broken', label: 'broken', scope: 'user', project: null, source: 'x', enabled: true, command: 'node', args: ['broken.js'] },
+    { key: 'slow', label: 'slow', scope: 'user', project: null, source: 'x', enabled: true, command: 'node', args: ['slow.js'] },
+    { key: 'fine', label: 'fine', scope: 'user', project: null, source: 'x', enabled: true, command: 'node', args: ['fine.js'] },
+  ] };
+  const facts = [
+    status('broken', 'failed', 's1'),
+    status('slow', 'pending', 's1'),
+    status('fine', 'connected', 's1'),
+  ];
+  const findings = analyzeMcp(facts, cfg, ctx);
+  assert.equal(findings.find(f => f.id === 'mcp-failed-connect').evidence.inspect, 'npx @modelcontextprotocol/inspector node broken.js');
+  assert.equal(findings.find(f => f.id === 'mcp-stuck-pending').evidence.inspect, 'npx @modelcontextprotocol/inspector node slow.js');
+  assert.equal(findings.find(f => f.id === 'mcp-ok').evidence.inspect, undefined);
+});
