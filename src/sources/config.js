@@ -30,17 +30,12 @@ const normPath = p => {
   return process.platform === 'win32' ? r.toLowerCase() : r;
 };
 
-// Project-scope .mcp.json servers need explicit approval before Claude Code will
-// load them. Merges enableAllProjectMcpServers / enabledMcpjsonServers /
-// disabledMcpjsonServers across ~/.claude.json's projects[<this folder>] entry
-// and the project's own settings files, and returns a per-name approval check.
+// A project-scope .mcp.json server is disabled only when it's explicitly named
+// in disabledMcpjsonServers, merged across ~/.claude.json's projects[<this
+// folder>] entry and the project's own settings files. Returns a per-name check.
 function mcpApproval(globalProjects, project, projectSettingsList) {
-  let enableAll = false;
-  const enabledNames = new Set();
   const disabledNames = new Set();
   const consider = settings => {
-    if (settings.enableAllProjectMcpServers === true) enableAll = true;
-    for (const n of list(settings.enabledMcpjsonServers)) if (typeof n === 'string') enabledNames.add(n);
     for (const n of list(settings.disabledMcpjsonServers)) if (typeof n === 'string') disabledNames.add(n);
   };
   const target = normPath(project);
@@ -48,7 +43,7 @@ function mcpApproval(globalProjects, project, projectSettingsList) {
     if (normPath(key) === target) consider(obj(entry));
   }
   for (const settings of projectSettingsList) consider(settings);
-  return name => !disabledNames.has(name) && (enabledNames.has(name) || enableAll);
+  return name => !disabledNames.has(name);
 }
 
 // Collects configured MCP servers, hooks and enabled plugins from every place Claude Code keeps them.

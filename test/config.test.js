@@ -86,12 +86,24 @@ test('non-project scopes are always enabled', async () => {
   }
 });
 
-test('a project .mcp.json server with no approval anywhere defaults to disabled', async () => {
+test('a project .mcp.json server with no approval settings anywhere defaults to enabled', async () => {
   const home = makeFakeHome();
   try {
     home.write(join(home.projectDir, '.mcp.json'), { mcpServers: { a: {} } });
     const cfg = await loadConfig({ env: home.env, projectPaths: [home.projectDir] });
-    assert.equal(cfg.mcpServers[0].enabled, false);
+    assert.equal(cfg.mcpServers[0].enabled, true);
+  } finally {
+    home.cleanup();
+  }
+});
+
+test('empty enabledMcpjsonServers and disabledMcpjsonServers lists leave a project server enabled', async () => {
+  const home = makeFakeHome();
+  try {
+    home.write(join(home.projectDir, '.mcp.json'), { mcpServers: { a: {} } });
+    home.write(join(home.projectDir, '.claude', 'settings.json'), { enabledMcpjsonServers: [], disabledMcpjsonServers: [] });
+    const cfg = await loadConfig({ env: home.env, projectPaths: [home.projectDir] });
+    assert.equal(cfg.mcpServers[0].enabled, true);
   } finally {
     home.cleanup();
   }
