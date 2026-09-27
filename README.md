@@ -66,6 +66,17 @@ Then type `/silentfail` in any session. The report runs on your machine, and Cla
 
 Claude Code writes a log of every session to disk, and those logs record which MCP servers failed to connect, which tool calls failed, and how hooks ran. silentfail reads those logs, compares them with your settings, plugins and `.mcp.json` files, and reports the difference.
 
+## How it fits with other tools
+
+silentfail looks back at what actually happened. It works alongside:
+
+| Tool | Use it for |
+|---|---|
+| `/doctor` (built into Claude Code) | Checking and cleaning up your config and context size |
+| silentfail | Finding what actually failed, from your session history |
+| [MCP Inspector](https://github.com/modelcontextprotocol/inspector) | Debugging one server live. silentfail prints the exact command for each broken server |
+| [ccusage](https://github.com/ryoppippi/ccusage) | Seeing what Claude Code cost you |
+
 ## Limitations
 
 - Some hook events leave no trace in the logs when they succeed. Those show as UNKNOWN, never as broken.

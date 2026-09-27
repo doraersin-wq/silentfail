@@ -47,3 +47,9 @@ test('no user or model text can reach the pre-run shell command', () => {
   assert.ok(!body.includes('$ARGUMENTS'));
   assert.doesNotMatch(body, /\$\d/);
 });
+
+test('the skill offers the Inspector command and points config cleanup to /doctor', () => {
+  const { body } = skill();
+  assert.match(body, /`inspect` command/);
+  assert.match(body, /\/doctor/);
+});

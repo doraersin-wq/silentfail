@@ -22,3 +22,5 @@ node "${CLAUDE_PLUGIN_ROOT}/src/cli.js" --json --exit-zero
 6. Never change settings, config files or plugins yourself. Offer the fix and wait for the user to say yes.
 7. Don't open or read the session logs under `~/.claude/projects` yourself. The report already summarizes them.
 8. If the user asks for a different time window, run `node "${CLAUDE_PLUGIN_ROOT}/src/cli.js" --json --exit-zero --days <n>`, where `<n>` is a whole number from 1 to 3650.
+9. If a finding's evidence has an `inspect` command, offer it as the way to debug that server live with MCP Inspector. The user runs it, and it opens a local page.
+10. silentfail covers what actually failed at runtime. For configuration and context-size cleanup, suggest Claude Code's built-in `/doctor` rather than auditing the config yourself.

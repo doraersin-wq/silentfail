@@ -1,5 +1,6 @@
 {
   "name": "silentfail",
+  "description": "Finds the parts of your Claude Code setup that look fine but are broken.",
   "owner": { "name": "SilentBuilder" },
   "plugins": [
     {
