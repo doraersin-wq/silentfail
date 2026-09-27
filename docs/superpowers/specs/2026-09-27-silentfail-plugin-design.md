@@ -208,3 +208,7 @@ silentfail adds to these tools rather than duplicating them. All of the followin
 - **Other `${VAR}` references** are printed literally, inside double quotes with `$` left unescaped when it's followed by `{`, so bash and zsh expand them the way Claude Code does. Their values are never read.
 - **Backslashes are no longer "safe" characters,** so Windows paths get quoted.
 - **Project `.mcp.json` approval, correcting v0.1 spec §11:** a server counts as disabled only when it's listed in `disabledMcpjsonServers`. On a real machine, a server with empty approval lists loaded and ran, so `enabledMcpjsonServers` and `enableAllProjectMcpServers` aren't reliable signals.
+
+**Live check (2026-09-27):** the plugin was installed from the local marketplace (v0.2.0, user scope), and `/silentfail` ran in a fresh session in Manual (ask) mode.
+- **Worked:** the pre-run executed with no permission prompt, so `Bash(node *silentfail*cli.js* --json --exit-zero)` matched the installed path, and Claude explained the findings. The installed copy exits 0 with valid JSON.
+- **Not exercised:** the skill's error path. §5's "step 1 reports it plainly" for a missing Node or a setup error (exit 2 or 127 from the pre-run) remains unverified.
