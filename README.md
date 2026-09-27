@@ -44,9 +44,23 @@ OK: 25 MCP servers, 1 hook (--all to list)
 --days <n>     how many days of session logs to read (default 14)
 --json         print JSON instead of the report
 --all          also list everything that is fine, and unrecognized log shapes
+--exit-zero    exit 0 even when something is broken (for scripts and the plugin)
 ```
 
 Exit codes: `0` nothing broken, `1` something is broken, `2` silentfail couldn't run.
+
+## Inside Claude Code
+
+silentfail is also a Claude Code plugin. Install it once:
+
+```
+/plugin marketplace add <github-user>/silentfail
+/plugin install silentfail@silentfail
+```
+
+From a local clone, use `/plugin marketplace add ./silentfail` instead.
+
+Then type `/silentfail` in any session. The report runs on your machine, and Claude walks you through each problem and how to fix it. It asks before changing anything. Claude sees the report, not your session logs.
 
 ## How it works
 

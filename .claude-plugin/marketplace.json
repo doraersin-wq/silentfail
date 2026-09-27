@@ -1,0 +1,11 @@
+{
+  "name": "silentfail",
+  "owner": { "name": "SilentBuilder" },
+  "plugins": [
+    {
+      "name": "silentfail",
+      "source": "./",
+      "description": "Finds MCP servers and hooks that look fine but are broken, and has Claude explain the fix."
+    }
+  ]
+}

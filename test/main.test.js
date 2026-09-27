@@ -27,7 +27,7 @@ test('--help prints usage and exits 0', async () => {
 test('--version prints the package version', async () => {
   const t = io();
   assert.equal(await main(['--version'], t.opts), 0);
-  assert.equal(t.out.text, '0.1.0\n');
+  assert.equal(t.out.text, '0.2.0\n');
 });
 
 test('a bad --days exits 2', async () => {
