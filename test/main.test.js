@@ -48,3 +48,9 @@ test('a missing Claude folder exits 2 with a clear message', async () => {
   assert.equal(await main([], t.opts), 2);
   assert.match(t.err.text, /No Claude Code folder found/);
 });
+
+test('--help lists --exit-zero', async () => {
+  const t = io();
+  assert.equal(await main(['--help'], t.opts), 0);
+  assert.match(t.out.text, /--exit-zero/);
+});

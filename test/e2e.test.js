@@ -90,3 +90,15 @@ test('end to end: an empty projects folder (no session logs at all) exits 0 and 
     home.cleanup();
   }
 });
+
+test('end to end: --exit-zero exits 0 but still reports the broken finding', () => {
+  const home = brokenHome();
+  try {
+    const r = runCli(home.env, '--json', '--exit-zero');
+    assert.equal(r.status, 0, r.stderr);
+    const json = JSON.parse(r.stdout);
+    assert.ok(json.findings.some(f => f.id === 'mcp-call-errors' && f.severity === 'broken' && f.subject === 'MCP filesystem'));
+  } finally {
+    home.cleanup();
+  }
+});

@@ -13,6 +13,7 @@ Options:
   --days <n>     how many days of session logs to read (default 14)
   --json         print JSON instead of the report
   --all          also list everything that is fine, and unrecognized log shapes
+  --exit-zero    exit 0 even when something is broken (for scripts and the plugin)
   -h, --help     show this help
   -v, --version  show the version
 
@@ -24,6 +25,7 @@ const OPTIONS = {
   days: { type: 'string', default: '14' },
   json: { type: 'boolean', default: false },
   all: { type: 'boolean', default: false },
+  'exit-zero': { type: 'boolean', default: false },
   help: { type: 'boolean', short: 'h', default: false },
   version: { type: 'boolean', short: 'v', default: false },
 };
@@ -54,7 +56,8 @@ export async function main(argv, { stdout = process.stdout, stderr = process.std
     const result = await run({ env, days });
     const color = Boolean(stdout.isTTY) && !env.NO_COLOR;
     stdout.write(args.json ? renderJson(result, { days }) : renderText(result, { days, all: args.all, color }));
-    return result.findings.some(f => f.severity === 'broken') ? 1 : 0;
+    const broken = result.findings.some(f => f.severity === 'broken');
+    return broken && !args['exit-zero'] ? 1 : 0;
   } catch (err) {
     if (err instanceof SetupError) {
       stderr.write(`${redact(err.message)}\n`);
