@@ -109,3 +109,21 @@ test('a server that failed then connected later in the same session is not a fai
     ['mcp-ok', 'ok', 'MCP flaky', 'connected in 1 of 1 session'],
   ]);
 });
+
+test('broken and never-seen servers carry an MCP Inspector command from the config', () => {
+  const cfg = { hooks: [], mcpServers: [
+    { key: 'fs', label: 'fs', scope: 'project', project: '/w/p', source: 'x', enabled: true, command: 'npx', args: ['-y', 'fs-server'] },
+    { key: 'ghost', label: 'ghost', scope: 'user', project: null, source: 'y', enabled: true, command: 'node', args: ['ghost.js'] },
+  ] };
+  const facts = [status('fs', 'connected'), call('fs', false), call('fs', false), status('other', 'connected')];
+  const findings = analyzeMcp(facts, cfg, ctx);
+  assert.equal(findings.find(f => f.id === 'mcp-call-errors').evidence.inspect, 'npx @modelcontextprotocol/inspector npx -y fs-server');
+  assert.equal(findings.find(f => f.id === 'mcp-never-seen').evidence.inspect, 'npx @modelcontextprotocol/inspector node ghost.js');
+});
+
+test('needs-auth and ok findings carry no Inspector command', () => {
+  const cfg = { hooks: [], mcpServers: [{ key: 'cf', label: 'cf', scope: 'user', project: null, source: 'x', enabled: true, command: 'node', args: ['cf.js'] }] };
+  const [f] = analyzeMcp([status('cf', 'needs-auth')], cfg, ctx);
+  assert.equal(f.id, 'mcp-needs-auth');
+  assert.equal(f.evidence.inspect, undefined);
+});

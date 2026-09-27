@@ -100,3 +100,12 @@ test('json report cuts stderr to its first line and 120 characters, like the tex
   const long = { ...result, findings: [{ ...result.findings[1], evidence: { ...result.findings[1].evidence, stderr: 'e'.repeat(300) } }] };
   assert.equal(JSON.parse(renderJson(long, { days: 14 })).findings[0].evidence.stderr.length, 120);
 });
+
+test('broken MCP findings print the MCP Inspector command, redacted', () => {
+  const out = renderText({
+    findings: [{ id: 'mcp-call-errors', severity: 'broken', subject: 'MCP fs', message: '2 of 2 calls failed', evidence: { inspect: 'npx @modelcontextprotocol/inspector npx -y fs-server --token sk-ant-FAKE0000000000000000' } }],
+    stats: { files: 1, sessions: 1, badLines: 0, unrecognized: {}, versions: { min: null, max: null }, warnings: [] },
+  }, { days: 14 });
+  assert.match(out, /debug live: npx @modelcontextprotocol\/inspector npx -y fs-server --token \[redacted\]/);
+  assert.ok(!out.includes('sk-ant-FAKE'));
+});

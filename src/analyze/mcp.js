@@ -1,5 +1,6 @@
 import { plural } from '../format.js';
 import { finding, later, ranInProject } from './common.js';
+import { inspectorCommand } from './inspect.js';
 
 export function createMcpAnalyzer() {
   const servers = new Map();
@@ -41,20 +42,26 @@ export function createMcpAnalyzer() {
         if (s) s.label = c.label;
       }
 
+      const withInspect = (evidence, key) => {
+        const c = config.mcpServers.find(x => x.key === key);
+        const inspect = c ? inspectorCommand(c) : null;
+        return inspect ? { ...evidence, inspect } : evidence;
+      };
+
       const findings = [];
-      for (const s of servers.values()) {
+      for (const [key, s] of servers) {
         const subject = `MCP ${s.label}`;
         const n = s.sessions.size;
         const before = findings.length;
         const failedNotConnected = [...s.failed].filter(id => !s.connected.has(id)).length;
         if (failedNotConnected > 0) {
-          findings.push(finding('mcp-failed-connect', 'broken', subject, `failed to connect in ${failedNotConnected} of ${plural(n, 'session')}`, { sessions: n, failed: failedNotConnected }));
+          findings.push(finding('mcp-failed-connect', 'broken', subject, `failed to connect in ${failedNotConnected} of ${plural(n, 'session')}`, withInspect({ sessions: n, failed: failedNotConnected }, key)));
         }
         if (s.errors > 0) {
           const ratio = s.errors / s.calls;
           const severity = s.calls >= 2 && ratio >= 0.5 ? 'broken' : ratio >= 0.2 ? 'warning' : null;
           if (severity) {
-            findings.push(finding('mcp-call-errors', severity, subject, `${s.errors} of ${plural(s.calls, 'call')} failed`, { calls: s.calls, errors: s.errors, lastError: s.lastError }));
+            findings.push(finding('mcp-call-errors', severity, subject, `${s.errors} of ${plural(s.calls, 'call')} failed`, withInspect({ calls: s.calls, errors: s.errors, lastError: s.lastError }, key)));
           }
         }
         const needsAuth = [...s.needsAuth].filter(id => !s.connected.has(id)).length;
@@ -63,7 +70,7 @@ export function createMcpAnalyzer() {
         }
         const stuck = [...s.pending].filter(id => !s.connected.has(id) && !s.failed.has(id) && !s.needsAuth.has(id)).length;
         if (stuck > 0) {
-          findings.push(finding('mcp-stuck-pending', 'warning', subject, `never finished connecting in ${stuck} of ${plural(n, 'session')}`, { sessions: n, stuck }));
+          findings.push(finding('mcp-stuck-pending', 'warning', subject, `never finished connecting in ${stuck} of ${plural(n, 'session')}`, withInspect({ sessions: n, stuck }, key)));
         }
         if (findings.length === before) {
           const message = s.calls > 0 ? `${plural(s.calls, 'call')}, ${s.errors} failed` : `connected in ${s.connected.size} of ${plural(n, 'session')}`;
@@ -81,7 +88,7 @@ export function createMcpAnalyzer() {
         const message = sawStatus
           ? `configured (${c.scope} scope) but never showed up in the logs`
           : "can't verify: these logs don't record which servers connected";
-        findings.push(finding('mcp-never-seen', severity, `MCP ${c.label}`, message, { scope: c.scope, source: c.source }));
+        findings.push(finding('mcp-never-seen', severity, `MCP ${c.label}`, message, withInspect({ scope: c.scope, source: c.source }, c.key)));
       }
       return findings;
     },

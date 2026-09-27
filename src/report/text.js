@@ -32,6 +32,7 @@ export function renderText(result, { days, all = false, color = false }) {
       const showDetail = all || severity === 'broken' || severity === 'warning';
       if (showDetail && f.evidence?.command) lines.push(`      command: ${redactLine(f.evidence.command)}`);
       if (showDetail && f.evidence?.stderr) lines.push(`      stderr: ${redactLine(f.evidence.stderr)}`);
+      if (showDetail && f.evidence?.inspect) lines.push(`      debug live: ${redactLine(f.evidence.inspect, 200)}`);
     }
     lines.push('');
   }

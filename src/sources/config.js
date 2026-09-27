@@ -60,10 +60,15 @@ export async function loadConfig({ env = process.env, projectPaths = [] } = {}) 
   const enabled = new Set();
 
   const addServers = (servers, scope, project, source, plugin = null, isEnabled = () => true) => {
-    for (const name of Object.keys(obj(servers))) {
+    for (const [name, cfg] of Object.entries(obj(servers))) {
       const label = plugin ? `plugin:${plugin}:${name}` : name;
       if (plugin && mcpServers.some(s => s.label === label)) continue;
-      mcpServers.push({ key: serverKey(label), label, scope, project, source, enabled: isEnabled(name) });
+      const spec = obj(cfg);
+      mcpServers.push({
+        key: serverKey(label), label, scope, project, source, enabled: isEnabled(name),
+        command: typeof spec.command === 'string' ? spec.command : null,
+        args: list(spec.args).filter(a => typeof a === 'string'),
+      });
     }
   };
   const addHooks = (config, scope, project, source, plugin = null) => {
