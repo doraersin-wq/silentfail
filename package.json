@@ -2,6 +2,7 @@
   "name": "silentfail",
   "version": "0.2.0",
   "description": "Finds the parts of your Claude Code setup that look fine but are broken: MCP servers and hooks, straight from your own session logs.",
+  "author": "SilentBuilder",
   "homepage": "https://github.com/doraersin-wq/silentfail#readme",
   "repository": {
     "type": "git",

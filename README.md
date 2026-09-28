@@ -1,5 +1,7 @@
 # silentfail
 
+[![tests](https://github.com/doraersin-wq/silentfail/actions/workflows/ci.yml/badge.svg)](https://github.com/doraersin-wq/silentfail/actions/workflows/ci.yml)
+
 Finds the parts of your Claude Code setup that look fine but are broken.
 
 ```
