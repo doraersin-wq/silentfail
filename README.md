@@ -55,7 +55,7 @@ Exit codes: `0` nothing broken, `1` something is broken, `2` silentfail couldn't
 silentfail is also a Claude Code plugin. Install it once:
 
 ```
-/plugin marketplace add <github-user>/silentfail
+/plugin marketplace add doraersin-wq/silentfail
 /plugin install silentfail@silentfail
 ```
 

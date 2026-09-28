@@ -63,7 +63,7 @@ export async function main(argv, { stdout = process.stdout, stderr = process.std
       stderr.write(`${redact(err.message)}\n`);
       return 2;
     }
-    stderr.write(`silentfail hit a bug: ${redact(err?.stack ?? String(err))}\nPlease open an issue with this output. It contains no conversation content.\n`);
+    stderr.write(`silentfail hit a bug: ${redact(err?.stack ?? String(err))}\nPlease open an issue at https://github.com/doraersin-wq/silentfail/issues with this output. It contains no conversation content.\n`);
     return 2;
   }
 }

@@ -2,14 +2,36 @@
   "name": "silentfail",
   "version": "0.2.0",
   "description": "Finds the parts of your Claude Code setup that look fine but are broken: MCP servers and hooks, straight from your own session logs.",
+  "homepage": "https://github.com/doraersin-wq/silentfail#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/doraersin-wq/silentfail.git"
+  },
+  "bugs": {
+    "url": "https://github.com/doraersin-wq/silentfail/issues"
+  },
   "type": "module",
-  "bin": { "silentfail": "src/cli.js" },
-  "files": ["src/", "README.md", "LICENSE"],
-  "engines": { "node": ">=22" },
+  "bin": {
+    "silentfail": "src/cli.js"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "test": "node --test \"test/**/*.test.js\"",
     "test:stress": "node --test test/stress/big-file.stress.js"
   },
-  "keywords": ["claude-code", "mcp", "hooks", "diagnostics", "doctor"],
+  "keywords": [
+    "claude-code",
+    "mcp",
+    "hooks",
+    "diagnostics",
+    "doctor"
+  ],
   "license": "MIT"
 }

@@ -2,7 +2,16 @@
   "name": "silentfail",
   "version": "0.2.0",
   "description": "Finds the parts of your Claude Code setup that look fine but are broken: MCP servers and hooks, from your own session logs.",
-  "author": { "name": "SilentBuilder" },
+  "author": {
+    "name": "SilentBuilder"
+  },
+  "homepage": "https://github.com/doraersin-wq/silentfail",
+  "repository": "https://github.com/doraersin-wq/silentfail",
   "license": "MIT",
-  "keywords": ["mcp", "hooks", "diagnostics", "doctor"]
+  "keywords": [
+    "mcp",
+    "hooks",
+    "diagnostics",
+    "doctor"
+  ]
 }
